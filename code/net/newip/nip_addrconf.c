@@ -1,0 +1,886 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+/*
+ * Copyright (c) 2022 Huawei Device Co., Ltd.
+ *
+ * NewIP Address [auto]configuration
+ * Linux NewIP INET implementation
+ *
+ * Based on net/ipv6/addrconf.c
+ */
+#include <linux/errno.h>
+#include <linux/types.h>
+#include <linux/kernel.h>
+#include <linux/socket.h>
+#include <linux/sockios.h>
+#include <linux/net.h>
+
+#include <linux/nip_addr.h>
+#include <linux/netdevice.h>
+#include <linux/route.h>
+#include <linux/inetdevice.h>
+#include <linux/init.h>
+#include <linux/string.h>
+#include <linux/hash.h>
+#include <linux/proc_fs.h>
+
+#include <net/net_namespace.h>
+#include <net/sock.h>
+#include <net/nip.h>
+#include <net/protocol.h>
+#include <net/ndisc.h>
+#include <net/nip_route.h>
+#include <net/nip_addrconf.h>
+#include <net/tcp.h>
+#include <net/ip.h>
+#include <net/netlink.h>
+#include <net/pkt_sched.h>
+#include <net/addrconf.h>
+#include <linux/rtnetlink.h>
+#include <linux/export.h>
+
+#include "nip_hdr.h"
+
+#define	INFINITY_LIFE_TIME	0xFFFFFFFF
+
+/* Configured unicast address hash table */
+static struct hlist_head ninet_addr_lst[NIN_ADDR_HSIZE];
+static DEFINE_SPINLOCK(addrconf_hash_lock);
+
+static bool nip_chk_same_addr(struct net *net, const struct nip_addr *addr,
+			      struct net_device *dev);
+static int nip_get_firstaddr(const struct net_device *dev,
+			     struct nip_addr *addr);
+static int nip_addrconf_ifdown(struct net_device *dev, int how);
+
+static struct nip_devconf newip_devconf_dflt __read_mostly = {
+	.forwarding = 0,
+	.mtu = NIP_MIN_MTU,
+	.disable_nip = 0,
+	.ignore_routes_with_linkdown = 0,
+};
+
+/* Check if link is ready: is it up and is a valid qdisc available */
+static inline bool nip_addrconf_link_ready(const struct net_device *dev)
+{
+	return netif_oper_up(dev) && !qdisc_tx_is_noop(dev);
+}
+
+static void nip_link_dev_addr(struct ninet_dev *idev, struct ninet_ifaddr *ifp)
+{
+	list_add_tail(&ifp->if_list, &idev->addr_list);
+}
+
+static u32 ninet_addr_hash(const struct nip_addr *addr)
+{
+	return hash_32(nip_addr_hash(addr), NIN_ADDR_HSIZE_SHIFT);
+}
+
+static struct ninet_ifaddr *nip_add_addr(struct ninet_dev *idev,
+					 const struct nip_addr *addr,
+					 u32 flags, u32 valid_lft,
+					 u32 preferred_lft)
+{
+	struct ninet_ifaddr *ifa = NULL;
+	struct nip_rt_info *rt = NULL;
+	unsigned int hash;
+	int err = 0;
+
+	rcu_read_lock_bh();
+
+	nin_dev_hold(idev);
+
+	if (idev->dead) {
+		err = -ENODEV;
+		goto out2;
+	}
+
+	if (idev->cnf.disable_nip) {
+		err = -EACCES;
+		goto out2;
+	}
+
+	spin_lock(&addrconf_hash_lock);
+
+	/* Do not configure two same addresses in a netdevice */
+	if (nip_chk_same_addr(dev_net(idev->dev), addr, idev->dev)) {
+		DEBUG("%s: already assigned\n", __func__);
+		err = -EEXIST;
+		goto out;
+	}
+
+	ifa = kzalloc(sizeof(*ifa), GFP_ATOMIC);
+	if (!ifa) {
+		DEBUG("%s: malloc failed\n", __func__);
+		err = -ENOBUFS;
+		goto out;
+	}
+
+	rt = nip_addrconf_dst_alloc(idev, addr);
+	if (IS_ERR(rt)) {
+		err = PTR_ERR(rt);
+		goto out;
+	}
+
+	neigh_parms_data_state_setall(idev->nd_parms);
+
+	ifa->addr = *addr;
+
+	spin_lock_init(&ifa->lock);
+	INIT_HLIST_NODE(&ifa->addr_lst);
+	ifa->flags = flags;
+	ifa->valid_lft = valid_lft;
+	ifa->preferred_lft = preferred_lft;
+	ifa->tstamp = jiffies;
+	ifa->cstamp = ifa->tstamp;
+
+	ifa->rt = rt;
+
+	ifa->idev = idev;
+	refcount_set(&ifa->refcnt, 1);
+
+	/* Add to big hash table */
+	hash = ninet_addr_hash(addr);
+
+	hlist_add_head_rcu(&ifa->addr_lst, &ninet_addr_lst[hash]);
+	spin_unlock(&addrconf_hash_lock);
+
+	write_lock(&idev->lock);
+	/* Add to ninet_dev unicast addr list. */
+	nip_link_dev_addr(idev, ifa);
+
+	nin_ifa_hold(ifa);
+	write_unlock(&idev->lock);
+
+out2:
+	rcu_read_unlock_bh();
+
+	if (likely(err == 0)) {
+		DEBUG("%s: success! idev->refcnt=%u\n", __func__,
+		      refcount_read(&idev->refcnt));
+	} else {
+		kfree(ifa);
+		nin_dev_put(idev);
+		ifa = ERR_PTR(err);
+	}
+
+	return ifa;
+out:
+	spin_unlock(&addrconf_hash_lock);
+	goto out2;
+}
+
+static struct ninet_dev *nip_add_dev(struct net_device *dev)
+{
+	struct ninet_dev *ndev;
+	int err = -ENOMEM;
+
+	ASSERT_RTNL();
+
+	if (dev->mtu < NIP_MIN_MTU)
+		return ERR_PTR(-EINVAL);
+
+	ndev = kzalloc(sizeof(*ndev), GFP_KERNEL);
+	if (!ndev)
+		return ERR_PTR(err);
+
+	rwlock_init(&ndev->lock);
+	ndev->dev = dev;
+	INIT_LIST_HEAD(&ndev->addr_list);
+	memcpy(&ndev->cnf, dev_net(dev)->newip.devconf_dflt, sizeof(ndev->cnf));
+
+	ndev->cnf.mtu = dev->mtu;
+	ndev->nd_parms = neigh_parms_alloc(dev, &nnd_tbl);
+	if (!ndev->nd_parms) {
+		kfree(ndev);
+		return ERR_PTR(err);
+	}
+
+	/* We refer to the device */
+	dev_hold(dev);
+
+	refcount_set(&ndev->refcnt, 1);
+
+	DEBUG("%s: init ninet_dev success!, set ndev->refcnt=1\n", __func__);
+
+	if (netif_running(dev) && nip_addrconf_link_ready(dev))
+		ndev->if_flags |= IF_READY;
+
+	/* protected by rtnl_lock */
+	rcu_assign_pointer(dev->nip_ptr, ndev);
+	return ndev;
+}
+
+static struct ninet_dev *nip_find_idev(struct net_device *dev)
+{
+	struct ninet_dev *idev;
+
+	ASSERT_RTNL();
+
+	idev = __nin_dev_get(dev);
+	if (!idev) {
+		idev = nip_add_dev(dev);
+		if (IS_ERR(idev))
+			return NULL;
+	}
+	return idev;
+}
+
+static struct ninet_dev *nip_addrconf_add_dev(struct net_device *dev)
+{
+	struct ninet_dev *idev;
+
+	ASSERT_RTNL();
+
+	idev = nip_find_idev(dev);
+	if (!idev)
+		return ERR_PTR(-ENOBUFS);
+
+	if (idev->cnf.disable_nip)
+		return ERR_PTR(-EACCES);
+
+	return idev;
+}
+
+/* Manual configuration of address on an interface */
+static int ninet_addr_add(struct net *net, int ifindex,
+			  const struct nip_addr *pfx,
+			  __u32 ifa_flags, __u32 preferred_lft, __u32 valid_lft)
+{
+	struct ninet_ifaddr *ifp;
+	struct ninet_dev *idev;
+	struct net_device *dev;
+	unsigned long timeout;
+	clock_t expires;
+	u32 flags;
+	__u32 ifa_flags_tmp = ifa_flags;
+	__u32 valid_lft_tmp = valid_lft;
+
+	ASSERT_RTNL();
+
+	/* check the lifetime */
+	if (!valid_lft_tmp || preferred_lft > valid_lft_tmp)
+		return -EINVAL;
+
+	dev = __dev_get_by_index(net, ifindex);
+	if (!dev)
+		return -ENODEV;
+
+	idev = nip_addrconf_add_dev(dev);	/* 挂接dev和idev */
+	if (IS_ERR(idev))
+		return PTR_ERR(idev);
+
+	timeout = addrconf_timeout_fixup(valid_lft_tmp, HZ);
+	if (addrconf_finite_timeout(timeout)) {
+		expires = jiffies_to_clock_t(timeout * HZ);
+		valid_lft_tmp = timeout;
+	} else {
+		expires = 0;
+		flags = 0;
+		ifa_flags_tmp |= IFA_F_PERMANENT;
+	}
+
+	timeout = addrconf_timeout_fixup(preferred_lft, HZ);
+	if (addrconf_finite_timeout(timeout)) {
+		if (timeout == 0)
+			ifa_flags_tmp |= IFA_F_DEPRECATED;
+		preferred_lft = timeout;
+	}
+
+	ifp = nip_add_addr(idev, pfx, ifa_flags_tmp,
+			   valid_lft_tmp,
+			   preferred_lft);
+	if (!IS_ERR(ifp)) {
+		nin_ifa_put(ifp);
+		nip_ins_rt(ifp->rt);
+		DEBUG("%s: success! ifp->refcnt=%u\n", __func__,
+		      refcount_read(&ifp->refcnt));
+		return 0;
+	}
+
+	return PTR_ERR(ifp);
+}
+
+/* Nobody refers to this ifaddr, destroy it */
+void ninet_ifa_finish_destroy(struct ninet_ifaddr *ifp)
+{
+	WARN_ON(!hlist_unhashed(&ifp->addr_lst));
+
+	DEBUG("%s: before idev put. idev->refcnt=%u\n", __func__,
+	      refcount_read(&ifp->idev->refcnt));
+
+	nin_dev_put(ifp->idev);
+
+	nip_rt_put(ifp->rt);
+
+	kfree_rcu(ifp, rcu);
+}
+
+static void nip_del_addr(struct ninet_ifaddr *ifp)
+{
+	int state;
+
+	ASSERT_RTNL();
+
+	spin_lock_bh(&ifp->lock);
+	state = ifp->state;
+	ifp->state = NINET_IFADDR_STATE_DEAD;
+	spin_unlock_bh(&ifp->lock);
+
+	if (state == NINET_IFADDR_STATE_DEAD)
+		goto out;
+
+	spin_lock_bh(&addrconf_hash_lock);
+	hlist_del_init_rcu(&ifp->addr_lst);
+	spin_unlock_bh(&addrconf_hash_lock);
+
+	write_lock_bh(&ifp->idev->lock);
+
+	list_del_init(&ifp->if_list);
+	__nin_ifa_put(ifp);
+
+	write_unlock_bh(&ifp->idev->lock);
+
+	if (ifp->rt) {
+		/* If the ifp - & gt; Rt does not belong to any NIP_FIB_node.
+		 * The DST reference count does not change
+		 */
+		if (dst_hold_safe(&ifp->rt->dst))
+			nip_del_rt(ifp->rt);
+	}
+
+out:
+	nin_ifa_put(ifp);
+}
+
+static int ninet_addr_del(struct net *net, int ifindex, u32 ifa_flags,
+			  const struct nip_addr *pfx)
+{
+	struct ninet_ifaddr *ifp;
+	struct ninet_dev *idev;
+	struct net_device *dev;
+
+	dev = __dev_get_by_index(net, ifindex);
+	if (!dev)
+		return -ENODEV;
+
+	idev = __nin_dev_get(dev);
+	if (!idev)
+		return -ENXIO;
+
+	read_lock_bh(&idev->lock);
+	list_for_each_entry(ifp, &idev->addr_list, if_list) {
+		if (nip_addr_eq(pfx, &ifp->addr)) {
+			nin_ifa_hold(ifp);
+			read_unlock_bh(&idev->lock);
+
+			nip_del_addr(ifp);
+			DEBUG("nip_addr_del: success!");
+			return 0;
+		}
+	}
+	read_unlock_bh(&idev->lock);
+	return -EADDRNOTAVAIL;
+}
+
+int nip_addrconf_add_ifaddr(struct net *net, void __user *arg)
+{
+	struct nip_ifreq ireq;
+
+	int err;
+
+	if (!ns_capable(net->user_ns, CAP_NET_ADMIN)) {
+		DEBUG("%s: not admin can`t cfg.", __func__);
+		return -EPERM;
+	}
+
+	if (copy_from_user(&ireq, arg, sizeof(struct nip_ifreq))) {
+		DEBUG("%s: fail to copy cfg data.", __func__);
+		return -EFAULT;
+	}
+
+	if (nip_addr_invalid(&ireq.ifrn_addr)) {
+		DEBUG("%s: nip addr invalid.", __func__);
+		return -EFAULT;
+	}
+
+	if (nip_addr_public(&ireq.ifrn_addr)) {
+		DEBUG("%s: The public address cannot be configured.", __func__);
+		return -EFAULT;
+	}
+
+	rtnl_lock();
+	err = ninet_addr_add(net, ireq.ifrn_ifindex, &ireq.ifrn_addr,
+			     IFA_F_PERMANENT, INFINITY_LIFE_TIME,
+			     INFINITY_LIFE_TIME);
+	rtnl_unlock();
+	return err;
+}
+
+int nip_addrconf_del_ifaddr(struct net *net, void __user *arg)
+{
+	struct nip_ifreq ireq;
+	int err;
+
+	if (!ns_capable(net->user_ns, CAP_NET_ADMIN)) {
+		DEBUG("%s: not admin can`t cfg.", __func__);
+		return -EPERM;
+	}
+
+	if (copy_from_user(&ireq, arg, sizeof(struct nip_ifreq))) {
+		DEBUG("%s: fail to copy cfg data.", __func__);
+		return -EFAULT;
+	}
+
+	if (nip_addr_invalid(&ireq.ifrn_addr)) {
+		DEBUG("%s: nip addr invalid.", __func__);
+		return -EFAULT;
+	}
+
+	if (nip_addr_public(&ireq.ifrn_addr)) {
+		DEBUG("%s: Public addresses cannot be deleted.", __func__);
+		return -EFAULT;
+	}
+
+	rtnl_lock();
+	err = ninet_addr_del(net, ireq.ifrn_ifindex, 0, &ireq.ifrn_addr);
+	rtnl_unlock();
+	return err;
+}
+
+static bool nip_chk_same_addr(struct net *net, const struct nip_addr *addr,
+			      struct net_device *dev)
+{
+	unsigned int hash = ninet_addr_hash(addr);
+	struct ninet_ifaddr *ifp;
+
+	hlist_for_each_entry(ifp, &ninet_addr_lst[hash], addr_lst) {
+		if (!net_eq(dev_net(ifp->idev->dev), net))
+			continue;
+		if (nip_addr_eq(&ifp->addr, addr)) {
+			if (!dev || ifp->idev->dev == dev)
+				return true;
+		}
+	}
+	return false;
+}
+
+int __nip_get_lladdr(struct ninet_dev *idev, struct nip_addr *addr, u32 banned_flags)
+{
+	struct ninet_ifaddr *ifp;
+	int err = -EADDRNOTAVAIL;
+
+	list_for_each_entry_reverse(ifp, &idev->addr_list, if_list) {
+		if (!(ifp->flags & banned_flags)) {
+			*addr = ifp->addr;
+			err = 0;
+			break;
+		}
+	}
+	return err;
+}
+
+int nip_get_lladdr(struct net_device *dev, struct nip_addr *addr, u32 banned_flags)
+{
+	struct ninet_dev *idev;
+	int err = -EADDRNOTAVAIL;
+
+	rcu_read_lock();
+	idev = __nin_dev_get(dev);
+	if (idev) {
+		read_lock_bh(&idev->lock);
+		err = __nip_get_lladdr(idev, addr, banned_flags);
+		read_unlock_bh(&idev->lock);
+	}
+	rcu_read_unlock();
+	return err;
+}
+
+static int __nip_get_firstaddr(struct ninet_dev *idev, struct nip_addr *addr)
+{
+	struct ninet_ifaddr *ifp;
+	int err = -EADDRNOTAVAIL;
+
+	list_for_each_entry(ifp, &idev->addr_list, if_list) {
+		*addr = ifp->addr;
+		err = 0;
+		break;
+	}
+	return err;
+}
+
+static int nip_get_firstaddr(const struct net_device *dev,
+			     struct nip_addr *addr)
+{
+	struct ninet_dev *idev;
+	int err = -EADDRNOTAVAIL;
+
+	rcu_read_lock();
+	idev = __nin_dev_get(dev);
+	if (idev) {
+		read_lock_bh(&idev->lock);
+		err = __nip_get_firstaddr(idev, addr);
+		read_unlock_bh(&idev->lock);
+	}
+	rcu_read_unlock();
+	return err;
+}
+
+int nip_dev_get_saddr(struct net *net, const struct net_device *dev,
+		      const struct nip_addr *daddr, struct nip_addr *saddr)
+{
+	if (!dev || !saddr)
+		return -EADDRNOTAVAIL;
+
+	return nip_get_firstaddr(dev, saddr);
+}
+
+static int nip_addrconf_notify(struct notifier_block *this, unsigned long event,
+			       void *ptr)
+{
+	struct net_device *dev = netdev_notifier_info_to_dev(ptr);
+	struct ninet_dev *idev = __nin_dev_get(dev);
+	struct net *net = dev_net(dev);
+
+	switch (event) {
+	case NETDEV_REGISTER:
+		if (!idev && dev->mtu >= NIP_MIN_MTU) {
+			DEBUG("NIP_ADDRCONF(NETDEV_REGISTER): ");
+			idev = nip_add_dev(dev);
+			if (IS_ERR(idev))
+				return notifier_from_errno(PTR_ERR(idev));
+		}
+		break;
+
+	case NETDEV_CHANGEMTU:
+		/* if MTU under NIP_MIN_MTU stop New IP on this interface. */
+		if (dev->mtu < NIP_MIN_MTU) {
+			nip_addrconf_ifdown(dev, dev != net->loopback_dev);
+			break;
+		}
+
+		if (idev) {
+			idev->cnf.mtu = dev->mtu;
+			break;
+		}
+
+		/* allocate new idev */
+		idev = nip_add_dev(dev);
+		if (IS_ERR(idev))
+			break;
+
+		/* device is still not ready */
+		if (!(idev->if_flags & IF_READY))
+			break;
+
+		fallthrough;
+	case NETDEV_UP:
+	case NETDEV_CHANGE:
+		if (dev->flags & IFF_SLAVE)
+			break;
+
+		if (idev && idev->cnf.disable_nip)
+			break;
+
+		if (event == NETDEV_UP) {
+			if (!nip_addrconf_link_ready(dev)) {
+				/* device is not ready yet. */
+				DEBUG("NIP_ADDRCONF(NETDEV_UP): ");
+				DEBUG("%s:link is not ready\n", dev->name);
+				break;
+			}
+
+			if (!idev && dev->mtu >= NIP_MIN_MTU)
+				idev = nip_add_dev(dev);
+
+			if (!IS_ERR_OR_NULL(idev))
+				idev->if_flags |= IF_READY;
+		} else if (event == NETDEV_CHANGE) {
+			if (!nip_addrconf_link_ready(dev)) {
+				/* device is still not ready. */
+				break;
+			}
+
+			if (idev)
+				idev->if_flags |= IF_READY;
+
+			DEBUG("NIP_ADDRCONF(NETDEV_CHANGE):");
+			DEBUG("%s:link becomes ready\n", dev->name);
+		}
+
+		if (!IS_ERR_OR_NULL(idev)) {
+			/* If the MTU changed during the interface down,
+			 * when the interface up, the changed MTU must be
+			 * reflected in the idev as well as routers.
+			 */
+			if (idev->cnf.mtu != dev->mtu &&
+			    dev->mtu >= NIP_MIN_MTU) {
+				idev->cnf.mtu = dev->mtu;
+			}
+			idev->tstamp = jiffies;
+
+			/* If the changed mtu during down is lower than
+			 * NIP_MIN_MTU stop New IP on this interface.
+			 */
+			if (dev->mtu < NIP_MIN_MTU)
+				nip_addrconf_ifdown(dev,
+						    dev != net->loopback_dev);
+		}
+		break;
+
+	case NETDEV_DOWN:
+	case NETDEV_UNREGISTER:
+		/* Remove all addresses from this interface. */
+		nip_addrconf_ifdown(dev, event != NETDEV_DOWN);
+		break;
+	default:
+		break;
+	}
+
+	return NOTIFY_OK;
+}
+
+static int nip_addrconf_ifdown(struct net_device *dev, int how)
+{
+	struct net *net = dev_net(dev);
+	struct ninet_dev *idev = __nin_dev_get(dev);
+	struct ninet_ifaddr *ifa, *tmp;
+	struct list_head del_list;
+	int state, i;
+
+	ASSERT_RTNL();
+
+	nip_rt_ifdown(net, dev);
+	neigh_ifdown(&nnd_tbl, dev);
+	if (!idev)
+		return -ENODEV;
+
+	/* Step 1: remove reference to newip device from parent device.
+	 *         Do not dev_put!
+	 */
+	if (how) {
+		idev->dead = 1;
+
+		/* protected by rtnl_lock */
+		RCU_INIT_POINTER(dev->nip_ptr, NULL);
+	}
+
+	/* Step 2: clear hash table */
+	for (i = 0; i < NIN_ADDR_HSIZE; i++) {
+		struct hlist_head *h = &ninet_addr_lst[i];
+
+		spin_lock_bh(&addrconf_hash_lock);
+		hlist_for_each_entry_rcu(ifa, h, addr_lst) {
+			if (ifa->idev == idev)
+				hlist_del_init_rcu(&ifa->addr_lst);
+		}
+		spin_unlock_bh(&addrconf_hash_lock);
+	}
+
+	write_lock_bh(&idev->lock);
+
+	/* Step 2: clear flags for stateless addrconf */
+	if (!how)
+		idev->if_flags &= ~(IF_RS_SENT | IF_RA_RCVD | IF_READY);
+
+	/* Step 3: clear addr list in idev */
+	INIT_LIST_HEAD(&del_list);
+	list_for_each_entry_safe(ifa, tmp, &idev->addr_list, if_list) {
+		list_move(&ifa->if_list, &del_list);
+
+		write_unlock_bh(&idev->lock);
+		spin_lock_bh(&ifa->lock);
+
+		state = ifa->state;
+		ifa->state = NINET_IFADDR_STATE_DEAD;
+
+		spin_unlock_bh(&ifa->lock);
+		write_lock_bh(&idev->lock);
+	}
+	write_unlock_bh(&idev->lock);
+
+	/* now clean up addresses to be removed */
+	while (!list_empty(&del_list)) {
+		ifa = list_first_entry(&del_list, struct ninet_ifaddr, if_list);
+		list_del(&ifa->if_list);
+		nin_ifa_put(ifa);
+	}
+
+	/* Last: Shot the device (if unregistered) */
+	if (how) {
+		neigh_parms_release(&nnd_tbl, idev->nd_parms);
+		neigh_ifdown(&nnd_tbl, dev);
+		DEBUG("%s: before idev put. idev->refcnt=%u\n", __func__,
+		      refcount_read(&idev->refcnt));
+		nin_dev_put(idev);
+	}
+	return 0;
+}
+
+static int nip_addr_proc_show(struct seq_file *seq, void *v)
+{
+	struct net *net = seq->private;
+	struct ninet_ifaddr *ifp;
+	int i, j;
+
+	rcu_read_lock();
+	for (i = 0; i < NIN_ADDR_HSIZE; i++) {
+		hlist_for_each_entry_rcu(ifp, &ninet_addr_lst[i], addr_lst) {
+			if (!net_eq(dev_net(ifp->idev->dev), net))
+				continue;
+
+			for (j = 0; j < ifp->addr.bitlen / NIP_ADDR_BIT_LEN_8;
+			     j++) {
+				seq_printf(seq, "%02x",
+					   ifp->addr.nip_addr_field8[j]);
+			}
+			seq_printf(seq, "\t%8s\n",
+				   ifp->idev->dev ? ifp->idev->dev->name : "");
+		}
+	}
+	rcu_read_unlock();
+	return 0;
+}
+
+static int __net_init nip_addr_net_init(struct net *net)
+{
+	int err = -ENOMEM;
+	struct nip_devconf *dflt;
+
+	dflt = kmemdup(&newip_devconf_dflt,
+		       sizeof(newip_devconf_dflt),
+		       GFP_KERNEL);
+	if (!dflt)
+		goto err_alloc_dflt;
+
+	net->newip.devconf_dflt = dflt;
+
+	if (!proc_create_net_single("nip_addr", 0444, net->proc_net,
+				    nip_addr_proc_show, NULL)) {
+		goto err_addr_proc;
+	}
+
+	return 0;
+
+err_addr_proc:
+	kfree(dflt);
+err_alloc_dflt:
+	return err;
+}
+
+static void __net_exit nip_addr_net_exit(struct net *net)
+{
+	kfree(net->newip.devconf_dflt);
+	remove_proc_entry("nip_addr", net->proc_net);
+}
+
+static struct pernet_operations nip_route_proc_net_ops = {
+	.init = nip_addr_net_init,
+	.exit = nip_addr_net_exit,
+};
+
+/* addrconf module should be notified of a device going up
+ */
+static struct notifier_block nip_dev_notf = {
+	.notifier_call = nip_addrconf_notify,
+	.priority = ADDRCONF_NOTIFY_PRIORITY,
+};
+
+int __init nip_addrconf_init(void)
+{
+	int err;
+
+	err = register_pernet_subsys(&nip_route_proc_net_ops);
+	if (err < 0) {
+		DEBUG("%s: register_pernet_subsys failed!\n", __func__);
+		goto out;
+	}
+
+	register_netdevice_notifier(&nip_dev_notf);
+
+out:
+	return err;
+}
+
+void nip_addrconf_cleanup(void)
+{
+	struct net_device *dev;
+	int i;
+
+	unregister_netdevice_notifier(&nip_dev_notf);
+	unregister_pernet_subsys(&nip_route_proc_net_ops);
+
+	rtnl_lock();
+
+	/* clean dev list */
+	for_each_netdev(&init_net, dev) {
+		if (!__nin_dev_get(dev))
+			continue;
+		nip_addrconf_ifdown(dev, 1);
+	}
+
+	/* Check hash table. */
+	spin_lock_bh(&addrconf_hash_lock);
+	for (i = 0; i < NIN_ADDR_HSIZE; i++)
+		WARN_ON(!hlist_empty(&ninet_addr_lst[i]));
+	spin_unlock_bh(&addrconf_hash_lock);
+	rtnl_unlock();
+}
+
+static int ninet_addr_get(const struct net_device *dev, struct ninet_ifaddr *ifa)
+{
+	int err;
+	struct nip_addr addr;
+
+	err = nip_get_firstaddr(dev, &addr);
+	if (err)
+		return err;
+	ifa->addr = addr;
+
+	return err;
+}
+
+int nip_addrconf_get_ifaddr(struct net *net, unsigned int cmd, void __user *arg)
+{
+	struct nip_devreq ifr;
+	struct sockaddr_nin *snin;
+	struct ninet_ifaddr ifa;
+	struct net_device *dev;
+	void __user *p = (void __user *)arg;
+	int ret = -EFAULT;
+
+	if (copy_from_user(&ifr, p, sizeof(struct nip_ifreq)))
+		goto out;
+
+	ifr.nip_ifr_name[IFNAMSIZ - 1] = 0;
+	snin = (struct sockaddr_nin *)&ifr.nip_dev_addr;
+
+	DEBUG("%s, dev name is %s", __func__, ifr.nip_ifr_name);
+	dev_load(net, ifr.nip_ifr_name);
+
+	if (cmd == SIOCGIFADDR) {
+		memset(snin, 0, sizeof(*snin));
+		snin->sin_family = AF_NINET;
+	} else {
+		goto out;
+	}
+
+	rtnl_lock();
+
+	dev = __dev_get_by_name(net, ifr.nip_ifr_name);
+	if (!dev)
+		goto done;
+
+	ret = ninet_addr_get(dev, &ifa);
+	if (ret)
+		goto done;
+	/* Get interface address */
+	snin->sin_addr = ifa.addr;
+
+	if (copy_to_user(p, &ifr, sizeof(struct nip_devreq)))
+		ret = -EFAULT;
+
+done:
+	rtnl_unlock();
+out:
+	return ret;
+}
