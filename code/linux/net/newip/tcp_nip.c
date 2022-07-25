@@ -59,7 +59,6 @@
 #include <linux/sockios.h>
 #include <linux/net.h>
 #include <linux/jiffies.h>
-#include <linux/nip_addr.h>
 #include <linux/netdevice.h>
 #include <linux/init.h>
 #include <linux/jhash.h>

@@ -97,23 +97,6 @@ struct nip_addr {
 };
 #pragma pack()
 
-#define POD_SOCKADDR_SIZE 10
-
-struct sockaddr_nin {
-	unsigned short sin_family; /* AF_NINET */
-	unsigned short sin_port;   /* Transport layer port, big-endian */
-	struct nip_addr sin_addr;  /* NIP address */
-
-	/* Pad to size of struct sockaddr
-	 * We don't neet to use this field
-	 * Due to the flexible size of nip_addr, we consider the extreme situation:
-	 * the size of nip_addr is 2 bytes, so we need to add 10 bytes to make sure
-	 * it has the same size as struct sockaddr. And it won't have trouble if you
-	 * increase the length of nip_addr.
-	 */
-	unsigned char sin_zero[POD_SOCKADDR_SIZE];
-};
-
 extern const struct nip_addr nip_any_addr;
 extern const struct nip_addr nip_broadcast_addr_arp;
 

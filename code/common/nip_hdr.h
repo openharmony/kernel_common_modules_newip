@@ -27,21 +27,26 @@
 #ifndef _NEWIP_HDR_H
 #define _NEWIP_HDR_H
 
-#include <linux/nip_addr.h>
+#include "nip_addr.h"
 
 /* Ethernet head 14B, +2B byte alignment, +66 to avoid
  * HMAC driver SKB space expansion caused by Coredum problem
+ */
+/* This parameter is used only to apply for the length of the packet buffer,
+ * but not to determine the actual packet header length
  */
 #define NIP_ETH_HDR_BASE_LEN 14
 #define NIP_ETH_HDR_LEN (NIP_ETH_HDR_BASE_LEN + 2 + 66)
 
 /* bitmap1 + bitmap2 + TTL + total len + nexthd + daddr + saddr
- * 1B        1B        1B    2B          1B       7B      7B    = 20B
- * NIP_HDR_MAX 可以从50 修改成 20
+ * 1B        1B        1B    2B          1B       9B      9B    = 24B
  * V4  TCP 1448
  * NIP TCP 1430 + 30 = 1460
  */
-#define NIP_HDR_MAX 8   // 50 -> 8
+/* This interface is only used to define the buffer length.
+ * To calculate the packet header length, use the "get_nip_hdr_len" func
+ */
+#define NIP_HDR_MAX 24
 #define NIP_UDP_HDR_LEN 8
 #define NIP_MIN_MTU (NIP_HDR_MAX + NIP_UDP_HDR_LEN)
 #define NIP_BYTE_ALIGNMENT 2
@@ -98,6 +103,13 @@
 #define NIP_DEFAULT_TTL 128
 #define NIP_ARP_DEFAULT_TTL 64
 #define IPPROTO_NIP_ICMP 0xB1
+
+enum NIP_HDR_TYPE {
+	NIP_HDR_UDP = 0,
+	NIP_HDR_COMM = 1,
+
+	NIP_HDR_TYPE_MAX,
+};
 
 enum NIP_HDR_DECAP_ERR {
 	NIP_HDR_BITMAP_INVALID = 1,
@@ -195,7 +207,9 @@ struct nip_pkt_seg_info {
 	unsigned int usr_data_len;     /* Length of user data read this time */
 };
 
-void nip_calc_pkt_frag_num(unsigned int mtu, unsigned int usr_data_len,
+void nip_calc_pkt_frag_num(unsigned int mtu,
+			   unsigned int nip_hdr_len,
+			   unsigned int usr_data_len,
 			   struct nip_pkt_seg_info *seg_info);
 
 void nip_hdr_udp_encap(struct nip_hdr_encap *head);
@@ -208,6 +222,14 @@ void nip_update_total_len(struct nip_hdr_encap *head, unsigned short total_len);
 
 /* Note: a function call requires its own byte order conversion.(niph->total_len) */
 int nip_hdr_parse(unsigned char *buf, unsigned int buf_len, struct nip_hdr_decap *niph);
+
+/* The length of the packet header is obtained according to the packet type,
+ * source ADDRESS, and destination address.
+ * If the packet does not carry the source address or destination address, fill in the blank
+ */
+int get_nip_hdr_len(enum NIP_HDR_TYPE hdr_type,
+		    const struct nip_addr *saddr,
+		    const struct nip_addr *daddr);
 
 struct udp_hdr {
 	unsigned short	sport;

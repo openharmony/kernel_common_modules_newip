@@ -30,10 +30,12 @@
 #define FMT_FACTORY_NUM_MAX 1
 #define ENCAP_FACTORY_NUM_MAX 1
 
-void nip_calc_pkt_frag_num(unsigned int mtu, unsigned int usr_data_len,
+void nip_calc_pkt_frag_num(unsigned int mtu,
+			   unsigned int nip_hdr_len,
+			   unsigned int usr_data_len,
 			   struct nip_pkt_seg_info *seg_info)
 {
-	unsigned int mid_usr_pkt_len = (mtu - NIP_HDR_MAX - NIP_UDP_HDR_LEN) &
+	unsigned int mid_usr_pkt_len = (mtu - nip_hdr_len - NIP_UDP_HDR_LEN) &
 				       INTEGER_MULTIPLE_OF_8;
 	unsigned int mid_pkt_num = usr_data_len / mid_usr_pkt_len;
 	unsigned int last_usr_pkt_len = 0;
@@ -99,6 +101,8 @@ void nip_update_total_len(struct nip_hdr_encap *head, unsigned short total_len)
 	*head->total_len_pos = total_len;
 }
 
+#define BITMAP1_OFFSET 1
+#define BITMAP2_OFFSET 2
 static inline void _nip_hdr_encap_udp_bitmap(struct nip_hdr_encap *head)
 {
 	/* bitmap(1B) + ttl(1B) + total_len(2B) + nexthdr(1B) + daddr(xB) + saddr(xB) */
@@ -109,11 +113,11 @@ static inline void _nip_hdr_encap_udp_bitmap(struct nip_hdr_encap *head)
 	if (((head->daddr.bitlen / NIP_ADDR_BIT_LEN_8) + (head->saddr.bitlen / NIP_ADDR_BIT_LEN_8))
 	    % NIP_BYTE_ALIGNMENT != 0) {
 		head->hdr_buf[0] = NIP_UDP_BITMAP_1;
-		head->hdr_buf_pos = 1;
+		head->hdr_buf_pos = BITMAP1_OFFSET;
 	} else {
 		head->hdr_buf[0] = NIP_UDP_BITMAP_1_INC_2;
 		head->hdr_buf[1] = NIP_NODATA_BITMAP_2;
-		head->hdr_buf_pos = 2;
+		head->hdr_buf_pos = BITMAP2_OFFSET;
 	}
 }
 
@@ -127,11 +131,11 @@ static inline void _nip_hdr_encap_comm_bitmap(struct nip_hdr_encap *head)
 	if (((head->daddr.bitlen / NIP_ADDR_BIT_LEN_8) + (head->saddr.bitlen / NIP_ADDR_BIT_LEN_8))
 	    % NIP_BYTE_ALIGNMENT != 0) {
 		head->hdr_buf[0] = NIP_NORMAL_BITMAP_1;
-		head->hdr_buf_pos = 1;
+		head->hdr_buf_pos = BITMAP1_OFFSET;
 	} else {
 		head->hdr_buf[0] = NIP_NORMAL_BITMAP_1_INC_2;
 		head->hdr_buf[1] = NIP_NODATA_BITMAP_2;
-		head->hdr_buf_pos = 2;
+		head->hdr_buf_pos = BITMAP2_OFFSET;
 	}
 }
 
@@ -171,5 +175,50 @@ void nip_hdr_comm_encap(struct nip_hdr_encap *head)
 	_nip_hdr_nexthdr_encap(head);
 	_nip_hdr_daddr_encap(head);
 	_nip_hdr_saddr_encap(head);
+}
+
+#if (NEWIP_BYTE_ALIGNMENT_ENABLE == 1)    // include bitmap2
+#define NIP_COMM_HDR_LEN_NOINCLUDE_ADDR 6 // include total len
+#define NIP_UDP_HDR_LEN_NOINCLUDE_ADDR  4 // not include total len
+#else
+#define NIP_COMM_HDR_LEN_NOINCLUDE_ADDR 5 // include total len
+#define NIP_UDP_HDR_LEN_NOINCLUDE_ADDR  3 // not include total len
+#endif
+/* bitmap1 + bitmap2 + TTL + total len + nexthd + daddr + saddr
+ * 1B        1B        1B    2B          1B       7B      7B    = 20B
+ * NIP_HDR_MAX 20
+ * V4  TCP 1448
+ * NIP TCP 1430 + 30 = 1460
+ */
+/* The length of the packet header is obtained according to the packet type,
+ * source ADDRESS, and destination address.
+ * If the packet does not carry the source address or destination address, fill in the blank
+ */
+int get_nip_hdr_len(enum NIP_HDR_TYPE hdr_type,
+		    const struct nip_addr *saddr,
+		    const struct nip_addr *daddr)
+{
+	int saddr_len = 0;
+	int daddr_len = 0;
+	enum NIP_HDR_TYPE base_len = hdr_type == NIP_HDR_UDP ?
+				     NIP_UDP_HDR_LEN_NOINCLUDE_ADDR :
+				     NIP_COMM_HDR_LEN_NOINCLUDE_ADDR;
+
+	if (hdr_type >= NIP_HDR_TYPE_MAX)
+		return 0;
+
+	if (saddr) {
+		saddr_len = get_nip_addr_len(saddr);
+		if (saddr_len == 0)
+			return 0;
+	}
+
+	if (daddr) {
+		daddr_len = get_nip_addr_len(daddr);
+		if (daddr_len == 0)
+			return 0;
+	}
+
+	return base_len + saddr_len + daddr_len;
 }
 

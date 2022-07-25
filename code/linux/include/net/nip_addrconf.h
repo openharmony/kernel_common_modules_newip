@@ -10,7 +10,6 @@
 #include <net/if_ninet.h>
 #include <net/nip.h>
 
-#include <linux/nip_addr.h>
 #include <linux/in.h>
 #include <linux/in6.h>
 #include <linux/netdevice.h>

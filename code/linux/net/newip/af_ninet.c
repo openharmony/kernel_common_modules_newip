@@ -37,7 +37,6 @@
 #include <net/nip_route.h>
 #include <net/nip_addrconf.h>
 #include <net/tcp_nip.h>
-#include <linux/nip_addr.h>
 #include <linux/nip.h>
 #include <linux/newip_route.h>
 

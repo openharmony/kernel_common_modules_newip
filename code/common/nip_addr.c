@@ -24,7 +24,7 @@
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include <linux/nip_addr.h>
+#include "nip_addr.h"
 
 /* This is similar to 0.0.0.0 in IPv4. Does not appear as a real address,
  * just a constant used by the native for special processing

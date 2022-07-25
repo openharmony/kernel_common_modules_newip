@@ -58,9 +58,11 @@ static inline int __tcp_nip_mtu_to_mss(struct sock *sk, int pmtu)
 	const struct tcp_sock *tp = tcp_sk(sk);
 	const struct inet_connection_sock *icsk = inet_csk(sk);
 	int mss_now;
+	int nip_hdr_len = get_nip_hdr_len(NIP_HDR_COMM, &sk->sk_nip_rcv_saddr, &sk->sk_nip_daddr);
 
 	/* Calculate base mss without TCP options: It is MMS_S - sizeof(tcphdr) of rfc1122 */
-	mss_now = pmtu - NIP_HDR_MAX - sizeof(struct tcphdr);
+	nip_hdr_len = nip_hdr_len == 0 ? NIP_HDR_MAX : nip_hdr_len;
+	mss_now = pmtu - nip_hdr_len - sizeof(struct tcphdr);
 
 	/* IPv6 adds a frag_hdr in case RTAX_FEATURE_ALLFRAG is set */
 	if (icsk->icsk_af_ops->net_frag_header_len) {
@@ -96,11 +98,11 @@ int tcp_nip_mss_to_mtu(struct sock *sk, int mss)
 	const struct tcp_sock *tp = tcp_sk(sk);
 	const struct inet_connection_sock *icsk = inet_csk(sk);
 	int mtu;
+	int nip_hdr_len = get_nip_hdr_len(NIP_HDR_COMM, &sk->sk_nip_rcv_saddr, &sk->sk_nip_daddr);
 
-	mtu = mss +
-	      tp->tcp_header_len +
-	      icsk->icsk_ext_hdr_len +
-	      NIP_HDR_MAX;
+	nip_hdr_len = nip_hdr_len == 0 ? NIP_HDR_MAX : nip_hdr_len;
+	mtu = mss + tp->tcp_header_len + icsk->icsk_ext_hdr_len + nip_hdr_len;
+
 	/* IPv6 adds a frag_hdr in case RTAX_FEATURE_ALLFRAG is set */
 	if (icsk->icsk_af_ops->net_frag_header_len) {
 		const struct dst_entry *dst = __sk_dst_get(sk);
@@ -342,12 +344,26 @@ static __u16 tcp_nip_advertise_mss(struct sock *sk)
 	struct tcp_sock *tp = tcp_sk(sk);
 	const struct dst_entry *dst = __sk_dst_get(sk);
 	int mss = tp->advmss;
+	int nip_hdr_len;
+	int nip_mss;
+	u32 mtu;
 
 	if (dst) {
 		unsigned int metric = dst_metric_advmss(dst);
 
 		if (metric < mss) {
 			mss = metric;
+			tp->advmss = mss;
+		}
+
+		mtu = dst_mtu(dst);
+		nip_hdr_len = get_nip_hdr_len(NIP_HDR_COMM, &sk->sk_nip_rcv_saddr,
+					      &sk->sk_nip_daddr);
+		nip_hdr_len = nip_hdr_len == 0 ? NIP_HDR_MAX : nip_hdr_len;
+		nip_mss = mtu - nip_hdr_len - sizeof(struct tcphdr);
+
+		if (nip_mss > mss) {
+			mss = nip_mss;
 			tp->advmss = mss;
 		}
 	}
@@ -699,6 +715,34 @@ static unsigned int tcp_nip_synack_options(struct request_sock *req,
 	return MAX_TCP_OPTION_SPACE - remaining;
 }
 
+static int get_nip_mss(const struct sock *sk, struct dst_entry *dst, struct request_sock *req)
+{
+	struct inet_request_sock *ireq = inet_rsk(req);
+	struct tcp_sock *tp = tcp_sk(sk);
+	u16 user_mss;
+	int mss;
+	int nip_hdr_len;
+	int nip_mss;
+	u32 mtu;
+
+	mss = dst_metric_advmss(dst);
+	user_mss = READ_ONCE(tp->rx_opt.user_mss);
+	if (user_mss && user_mss < mss)
+		mss = user_mss;
+
+	mtu = dst_mtu(dst);
+	nip_hdr_len = get_nip_hdr_len(NIP_HDR_COMM, &ireq->ir_nip_loc_addr, &ireq->ir_nip_rmt_addr);
+	nip_hdr_len = nip_hdr_len == 0 ? NIP_HDR_MAX : nip_hdr_len;
+	nip_mss = mtu - nip_hdr_len - sizeof(struct tcphdr);
+
+	if (nip_mss > mss) {
+		mss = nip_mss;
+		tp->advmss = mss;
+	}
+
+	return mss;
+}
+
 /* Function
  *	The SYN + ACK segment is constructed based on the current transport control block,
  *	routing information, and request information.
@@ -715,13 +759,11 @@ struct sk_buff *tcp_nip_make_synack(const struct sock *sk, struct dst_entry *dst
 				enum tcp_synack_type synack_type)
 {
 	struct inet_request_sock *ireq = inet_rsk(req);
-	const struct tcp_sock *tp = tcp_sk(sk);
 	struct tcp_md5sig_key *md5 = NULL;
 	struct tcp_nip_out_options opts;
 	struct sk_buff *skb;
 	int tcp_header_size;
 	struct tcphdr *th;
-	u16 user_mss;
 	int mss;
 	unsigned short check = 0;
 
@@ -746,10 +788,7 @@ struct sk_buff *tcp_nip_make_synack(const struct sock *sk, struct dst_entry *dst
 	/* set skb priority from sk */
 	skb->priority = sk->sk_priority;
 
-	mss = dst_metric_advmss(dst);
-	user_mss = READ_ONCE(tp->rx_opt.user_mss);
-	if (user_mss && user_mss < mss)
-		mss = user_mss;
+	mss = get_nip_mss(sk, dst, req);
 
 	/* Clear the options and set the associated timestamp */
 	memset(&opts, 0, sizeof(opts));

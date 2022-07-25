@@ -253,15 +253,16 @@ static int nip_hdr_check(struct nip_hdr_decap *niph)
  * 1.niph->total_len is network order.(big end), need change to host order
  * 2.niph->saddr/daddr is network order.(big end)
  */
-int nip_hdr_parse(unsigned char *buf, unsigned int buf_len, struct nip_hdr_decap *niph)
+int nip_hdr_parse(unsigned char *rcv_buf, unsigned int buf_len, struct nip_hdr_decap *niph)
 {
 	int i = 0;
 	int len;
 	int ret;
+	unsigned char *buf = rcv_buf;
 	unsigned char bitmap[BITMAP_MAX] = {0};
 	int num = _get_nip_hdr_bitmap(buf, bitmap, BITMAP_MAX);
 
-	if (num <= 0)
+	if (num <= 0 || !rcv_buf)
 		return num;
 
 	niph->hdr_real_len = num * sizeof(bitmap[0]);

@@ -14,7 +14,6 @@
 #include <linux/sockios.h>
 #include <linux/net.h>
 
-#include <linux/nip_addr.h>
 #include <linux/netdevice.h>
 #include <linux/route.h>
 #include <linux/inetdevice.h>

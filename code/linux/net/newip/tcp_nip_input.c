@@ -890,7 +890,7 @@ static void tcp_nip_ack_probe(struct sock *sk)
 #define DUP_ACK 0
 #define NOR_ACK 1
 #define ACK_DEF 2
-static void tcp_nip_ack_retrans(struct sock *sk, u32 ack, int ack_type)
+static void tcp_nip_ack_retrans(struct sock *sk, u32 ack, int ack_type, u32 retrans_num)
 {
 	int skb_index = 0;
 	struct tcp_sock *tp = tcp_sk(sk);
@@ -927,7 +927,7 @@ static void tcp_nip_ack_retrans(struct sock *sk, u32 ack, int ack_type)
 		if (TCP_SKB_CB(skb)->seq != tp->ack_retrans_seq)
 			continue;
 
-		if (skb_index < g_ack_retrans_num) {
+		if (skb_index < retrans_num) {
 			tcp_nip_retransmit_skb(sk, skb, 1);
 			skb_index++;
 			tp->ack_retrans_num++;
@@ -945,7 +945,7 @@ static void tcp_nip_ack_retrans(struct sock *sk, u32 ack, int ack_type)
 #define DUP_ACK_RETRANS_START_NUM 3
 #define DIVIDEND_UP 3
 #define DIVIDEND_DOWN 5
-static void tcp_nip_dup_ack_retrans(struct sock *sk, u32 ack)
+static void tcp_nip_dup_ack_retrans(struct sock *sk, u32 ack, u32 retrans_num)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
 
@@ -973,12 +973,12 @@ static void tcp_nip_dup_ack_retrans(struct sock *sk, u32 ack)
 			tp->ack_retrans_seq = ack;
 			tp->ack_retrans_num = 0;
 
-			tcp_nip_ack_retrans(sk, ack, DUP_ACK);
+			tcp_nip_ack_retrans(sk, ack, DUP_ACK, retrans_num);
 		}
 	}
 }
 
-static void tcp_nip_nor_ack_retrans(struct sock *sk, u32 ack)
+static void tcp_nip_nor_ack_retrans(struct sock *sk, u32 ack, u32 retrans_num)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
 
@@ -999,7 +999,7 @@ static void tcp_nip_nor_ack_retrans(struct sock *sk, u32 ack)
 			return;
 		}
 
-		tcp_nip_ack_retrans(sk, ack, NOR_ACK);
+		tcp_nip_ack_retrans(sk, ack, NOR_ACK, retrans_num);
 	}
 
 	tp->sacked_out = 0;
@@ -1110,12 +1110,12 @@ static int tcp_nip_ack(struct sock *sk, const struct sk_buff *skb, int flag)
 		tcp_nip_clean_rtx_queue(sk, &skb_snd_tstamp);
 
 		tcp_nip_ack_calc_ssthresh(sk, ack, icsk_rto_last, skb_snd_tstamp);
-		tcp_nip_nor_ack_retrans(sk, ack);
+		tcp_nip_nor_ack_retrans(sk, ack, g_ack_retrans_num);
 		return 1;
 	}
 
 	// ack == tp->snd_una
-	tcp_nip_dup_ack_retrans(sk, ack);
+	tcp_nip_dup_ack_retrans(sk, ack, g_dup_ack_retrans_num);
 
 	return 1;
 }

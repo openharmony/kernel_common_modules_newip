@@ -24,7 +24,6 @@
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include <linux/nip_addr.h>
 #include "nip_hdr.h"
 #include "nip_checksum.h"
 

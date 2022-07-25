@@ -19,7 +19,6 @@
 #include <linux/module.h>
 #include <linux/net.h>
 #include <linux/netdevice.h>
-#include <linux/nip_addr.h>
 #include <linux/nip.h>
 #include <linux/skbuff.h>
 #include <linux/socket.h>

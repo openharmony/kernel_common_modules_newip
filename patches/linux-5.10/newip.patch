@@ -1,0 +1,486 @@
+diff -Naur old/include/linux/netdevice.h new/include/linux/netdevice.h
+--- old/include/linux/netdevice.h	2022-07-23 18:52:45.626073631 +0800
++++ new/include/linux/netdevice.h	2022-07-23 18:52:45.666073630 +0800
+@@ -2016,6 +2016,9 @@
+ 	struct dn_dev __rcu     *dn_ptr;
+ #endif
+ 	struct inet6_dev __rcu	*ip6_ptr;
++#if IS_ENABLED(CONFIG_NEWIP)
++	struct ninet_dev __rcu	*nip_ptr; /* NIP */
++#endif
+ #if IS_ENABLED(CONFIG_AX25)
+ 	void			*ax25_ptr;
+ #endif
+diff -Naur old/include/linux/socket.h new/include/linux/socket.h
+--- old/include/linux/socket.h	2022-07-23 18:52:45.636073630 +0800
++++ new/include/linux/socket.h	2022-07-23 18:52:45.666073630 +0800
+@@ -223,8 +223,8 @@
+ 				 * reuses AF_INET address family
+ 				 */
+ #define AF_XDP		44	/* XDP sockets			*/
+-
+-#define AF_MAX		45	/* For now.. */
++#define AF_NINET	45	/* NIP */
++#define AF_MAX		46	/* For now.. */
+ 
+ /* Protocol families, same as address families. */
+ #define PF_UNSPEC	AF_UNSPEC
+@@ -274,6 +274,7 @@
+ #define PF_QIPCRTR	AF_QIPCRTR
+ #define PF_SMC		AF_SMC
+ #define PF_XDP		AF_XDP
++#define PF_NINET	AF_NINET	/* NIP */
+ #define PF_MAX		AF_MAX
+ 
+ /* Maximum queue length specifiable by listen.  */
+diff -Naur old/include/linux/tcp.h new/include/linux/tcp.h
+--- old/include/linux/tcp.h	2022-07-23 18:52:45.636073630 +0800
++++ new/include/linux/tcp.h	2022-07-23 18:52:45.666073630 +0800
+@@ -317,6 +317,9 @@
+ 
+ 	/* OOO segments go in this rbtree. Socket lock must be held. */
+ 	struct rb_root	out_of_order_queue;
++#ifdef CONFIG_NEWIP
++	struct sk_buff	*nip_out_of_order_queue; /* NIP */
++#endif
+ 	struct sk_buff	*ooo_last_skb; /* cache rb_last(out_of_order_queue) */
+ 
+ 	/* SACKs data, these 2 need to be together (see tcp_options_write) */
+@@ -412,6 +415,17 @@
+ 	 */
+ 	struct request_sock __rcu *fastopen_rsk;
+ 	struct saved_syn *saved_syn;
++
++#ifdef CONFIG_NEWIP
++/* newip tcp retrans */
++	u32 ack_retrans_num;
++	u32 ack_retrans_seq;
++	u32 nip_ssthresh;
++	u32 nip_ssthresh_reset;
++	bool nip_keepalive_enable;
++	u32 idle_ka_probes_out;
++	u32 nip_keepalive_timeout_scale;
++#endif
+ };
+ 
+ enum tsq_enum {
+@@ -423,6 +437,10 @@
+ 	TCP_MTU_REDUCED_DEFERRED,  /* tcp_v{4|6}_err() could not call
+ 				    * tcp_v{4|6}_mtu_reduced()
+ 				    */
++#ifdef CONFIG_NEWIP
++	TCP_NIP_WRITE_TIMER_DEFERRED,  /* NIP */
++	TCP_NIP_DELACK_TIMER_DEFERRED, /* NIP */
++#endif
+ };
+ 
+ enum tsq_flags {
+diff -Naur old/include/net/dst.h new/include/net/dst.h
+--- old/include/net/dst.h	2022-07-23 18:52:45.636073630 +0800
++++ new/include/net/dst.h	2022-07-23 18:52:45.676073630 +0800
+@@ -35,6 +35,8 @@
+ 	int			(*output)(struct net *net, struct sock *sk, struct sk_buff *skb);
+ 
+ 	unsigned short		flags;
++
++#define DST_HOST		0x0001	/* NIP */
+ #define DST_NOXFRM		0x0002
+ #define DST_NOPOLICY		0x0004
+ #define DST_NOCOUNT		0x0008
+diff -Naur old/include/net/inet_hashtables.h new/include/net/inet_hashtables.h
+--- old/include/net/inet_hashtables.h	2022-07-23 18:52:45.636073630 +0800
++++ new/include/net/inet_hashtables.h	2022-07-23 18:52:45.676073630 +0800
+@@ -83,6 +83,9 @@
+ #if IS_ENABLED(CONFIG_IPV6)
+ 	struct in6_addr		fast_v6_rcv_saddr;
+ #endif
++#if IS_ENABLED(CONFIG_NEWIP)
++	struct nip_addr		fast_nip_rcv_saddr;
++#endif
+ 	__be32			fast_rcv_saddr;
+ 	unsigned short		fast_sk_family;
+ 	bool			fast_ipv6_only;
+@@ -402,6 +405,13 @@
+ 		  const struct in6_addr *laddr, const u16 lport,
+ 		  const struct in6_addr *faddr, const __be16 fport);
+ 
++#ifdef CONFIG_NEWIP
++/* NIP */
++u32 ninet_ehashfn(const struct net *net,
++		  const struct nip_addr *laddr, const u16 lport,
++		  const struct nip_addr *faddr, const __be16 fport);
++#endif
++
+ static inline void sk_daddr_set(struct sock *sk, __be32 addr)
+ {
+ 	sk->sk_daddr = addr; /* alias of inet_daddr */
+diff -Naur old/include/net/inet_sock.h new/include/net/inet_sock.h
+--- old/include/net/inet_sock.h	2022-07-23 18:52:45.636073630 +0800
++++ new/include/net/inet_sock.h	2022-07-23 18:52:45.676073630 +0800
+@@ -73,6 +73,10 @@
+ #define ir_rmt_port		req.__req_common.skc_dport
+ #define ir_v6_rmt_addr		req.__req_common.skc_v6_daddr
+ #define ir_v6_loc_addr		req.__req_common.skc_v6_rcv_saddr
++
++#define ir_nip_rmt_addr		req.__req_common.nip_daddr /* NIP */
++#define ir_nip_loc_addr		req.__req_common.nip_rcv_saddr /* NIP */
++
+ #define ir_iif			req.__req_common.skc_bound_dev_if
+ #define ir_cookie		req.__req_common.skc_cookie
+ #define ireq_net		req.__req_common.skc_net
+@@ -97,6 +101,12 @@
+ 			struct sk_buff		*pktopts;
+ 		};
+ #endif
++#if IS_ENABLED(CONFIG_NEWIP)
++		/* NIP */
++		struct {
++			struct sk_buff		*nip_pktopts;
++		};
++#endif
+ 	};
+ };
+ 
+diff -Naur old/include/net/neighbour.h new/include/net/neighbour.h
+--- old/include/net/neighbour.h	2022-07-23 18:52:45.636073630 +0800
++++ new/include/net/neighbour.h	2022-07-23 18:52:45.676073630 +0800
+@@ -232,6 +232,9 @@
+ 	NEIGH_ARP_TABLE = 0,
+ 	NEIGH_ND_TABLE = 1,
+ 	NEIGH_DN_TABLE = 2,
++#ifdef CONFIG_NEWIP
++	NEIGH_NND_TABLE = 3,	/* NIP */
++#endif
+ 	NEIGH_NR_TABLES,
+ 	NEIGH_LINK_TABLE = NEIGH_NR_TABLES /* Pseudo table for neigh_xmit */
+ };
+diff -Naur old/include/net/net_namespace.h new/include/net/net_namespace.h
+--- old/include/net/net_namespace.h	2022-07-23 18:52:45.636073630 +0800
++++ new/include/net/net_namespace.h	2022-07-23 18:52:45.676073630 +0800
+@@ -38,6 +38,9 @@
+ #include <linux/idr.h>
+ #include <linux/skbuff.h>
+ #include <linux/notifier.h>
++#ifdef CONFIG_NEWIP
++#include <net/netns/nip.h>
++#endif
+ 
+ struct user_namespace;
+ struct proc_dir_entry;
+@@ -127,6 +130,9 @@
+ #if IS_ENABLED(CONFIG_IPV6)
+ 	struct netns_ipv6	ipv6;
+ #endif
++#if IS_ENABLED(CONFIG_NEWIP)
++	struct netns_newip	newip;  /* NIP */
++#endif
+ #if IS_ENABLED(CONFIG_IEEE802154_6LOWPAN)
+ 	struct netns_ieee802154_lowpan	ieee802154_lowpan;
+ #endif
+diff -Naur old/include/net/secure_seq.h new/include/net/secure_seq.h
+--- old/include/net/secure_seq.h	2022-07-23 18:52:45.636073630 +0800
++++ new/include/net/secure_seq.h	2022-07-23 18:52:45.676073630 +0800
+@@ -19,4 +19,11 @@
+ u64 secure_dccpv6_sequence_number(__be32 *saddr, __be32 *daddr,
+ 				  __be16 sport, __be16 dport);
+ 
++#ifdef CONFIG_NEWIP
++/* NIP */
++u64 secure_newip_port_ephemeral(const __be32 *saddr, const __be32 *daddr,
++				__be16 dport);
++__u32 secure_tcp_nip_sequence_number(const __be32 *saddr, const __be32 *daddr,
++				     __be16 sport, __be16 dport);
++#endif
+ #endif /* _NET_SECURE_SEQ */
+diff -Naur old/include/net/sock.h new/include/net/sock.h
+--- old/include/net/sock.h	2022-07-23 18:52:45.646073630 +0800
++++ new/include/net/sock.h	2022-07-23 18:52:45.676073630 +0800
+@@ -68,6 +68,9 @@
+ #include <net/tcp_states.h>
+ #include <linux/net_tstamp.h>
+ #include <net/l3mdev.h>
++#ifdef CONFIG_NEWIP
++#include <linux/nip_addr.h>
++#endif
+ 
+ /*
+  * This structure really needs to be cleaned up.
+@@ -202,6 +205,11 @@
+ 	struct in6_addr		skc_v6_rcv_saddr;
+ #endif
+ 
++#if IS_ENABLED(CONFIG_NEWIP)
++	struct nip_addr		nip_daddr;	/* NIP */
++	struct nip_addr		nip_rcv_saddr;	/* NIP */
++#endif
++
+ 	atomic64_t		skc_cookie;
+ 
+ 	/* following fields are padding to force
+@@ -379,6 +387,8 @@
+ #define sk_net			__sk_common.skc_net
+ #define sk_v6_daddr		__sk_common.skc_v6_daddr
+ #define sk_v6_rcv_saddr	__sk_common.skc_v6_rcv_saddr
++#define sk_nip_daddr		__sk_common.nip_daddr		/* NIP */
++#define sk_nip_rcv_saddr	__sk_common.nip_rcv_saddr	/* NIP */
+ #define sk_cookie		__sk_common.skc_cookie
+ #define sk_incoming_cpu		__sk_common.skc_incoming_cpu
+ #define sk_flags		__sk_common.skc_flags
+diff -Naur old/include/net/tcp.h new/include/net/tcp.h
+--- old/include/net/tcp.h	2022-07-23 18:52:45.646073630 +0800
++++ new/include/net/tcp.h	2022-07-23 18:52:45.676073630 +0800
+@@ -40,7 +40,9 @@
+ #include <net/inet_ecn.h>
+ #include <net/dst.h>
+ #include <net/mptcp.h>
+-
++#ifdef CONFIG_NEWIP
++#include <linux/nip.h> /* NIP */
++#endif
+ #include <linux/seq_file.h>
+ #include <linux/memcontrol.h>
+ #include <linux/bpf-cgroup.h>
+@@ -869,6 +871,9 @@
+ #if IS_ENABLED(CONFIG_IPV6)
+ 			struct inet6_skb_parm	h6;
+ #endif
++#if IS_ENABLED(CONFIG_NEWIP)
++			struct ninet_skb_parm	hnip; /* NIP */
++#endif
+ 		} header;	/* For incoming skbs */
+ 		struct {
+ 			__u32 flags;
+diff -Naur old/include/uapi/linux/if_ether.h new/include/uapi/linux/if_ether.h
+--- old/include/uapi/linux/if_ether.h	2022-07-23 18:52:45.646073630 +0800
++++ new/include/uapi/linux/if_ether.h	2022-07-23 18:52:45.676073630 +0800
+@@ -72,6 +72,7 @@
+ #define ETH_P_ERSPAN	0x88BE		/* ERSPAN type II		*/
+ #define ETH_P_IPX	0x8137		/* IPX over DIX			*/
+ #define ETH_P_IPV6	0x86DD		/* IPv6 over bluebook		*/
++#define ETH_P_NEWIP	0xEADD		/* NIP */
+ #define ETH_P_PAUSE	0x8808		/* IEEE Pause frames. See 802.3 31B */
+ #define ETH_P_SLOW	0x8809		/* Slow Protocol. See 802.3ad 43B */
+ #define ETH_P_WCCP	0x883E		/* Web-cache coordination protocol
+diff -Naur old/net/Kconfig new/net/Kconfig
+--- old/net/Kconfig	2022-07-23 18:52:45.656073630 +0800
++++ new/net/Kconfig	2022-07-23 18:52:45.676073630 +0800
+@@ -93,6 +93,7 @@
+ if INET
+ source "net/ipv4/Kconfig"
+ source "net/ipv6/Kconfig"
++source "net/newip/Kconfig"
+ source "net/netlabel/Kconfig"
+ source "net/mptcp/Kconfig"
+ 
+diff -Naur old/net/Makefile new/net/Makefile
+--- old/net/Makefile	2022-07-23 18:52:45.656073630 +0800
++++ new/net/Makefile	2022-07-23 18:52:45.676073630 +0800
+@@ -20,6 +20,7 @@
+ obj-$(CONFIG_XFRM)		+= xfrm/
+ obj-$(CONFIG_UNIX_SCM)		+= unix/
+ obj-$(CONFIG_NET)		+= ipv6/
++obj-$(CONFIG_NET)		+= newip/
+ obj-$(CONFIG_BPFILTER)		+= bpfilter/
+ obj-$(CONFIG_PACKET)		+= packet/
+ obj-$(CONFIG_NET_KEY)		+= key/
+diff -Naur old/net/core/neighbour.c new/net/core/neighbour.c
+--- old/net/core/neighbour.c	2022-07-23 18:52:45.646073630 +0800
++++ new/net/core/neighbour.c	2022-07-23 18:52:45.676073630 +0800
+@@ -1779,6 +1779,11 @@
+ 	case AF_DECnet:
+ 		tbl = neigh_tables[NEIGH_DN_TABLE];
+ 		break;
++#ifdef CONFIG_NEWIP
++	case AF_NINET:	/* NIP */
++		tbl = neigh_tables[NEIGH_NND_TABLE];
++		break;
++#endif
+ 	}
+ 
+ 	return tbl;
+diff -Naur old/net/core/secure_seq.c new/net/core/secure_seq.c
+--- old/net/core/secure_seq.c	2022-07-23 18:52:45.646073630 +0800
++++ new/net/core/secure_seq.c	2022-07-23 18:52:45.676073630 +0800
+@@ -151,6 +151,51 @@
+ EXPORT_SYMBOL_GPL(secure_ipv4_port_ephemeral);
+ #endif
+ 
++#ifdef CONFIG_NEWIP
++/* NIP */
++__u32 secure_tcp_nip_sequence_number(const __be32 *saddr, const __be32 *daddr,
++				     __be16 sport, __be16 dport)
++{
++	const struct {
++		struct nip_addr saddr;
++		struct nip_addr daddr;
++		__be16 sport;
++		__be16 dport;
++	} __aligned(SIPHASH_ALIGNMENT) combined = {
++		.saddr = *(struct nip_addr *)saddr,
++		.daddr = *(struct nip_addr *)daddr,
++		.sport = sport,
++		.dport = dport,
++	};
++	u32 hash;
++
++	net_secret_init();
++	hash = siphash(&combined, offsetofend(typeof(combined), dport),
++		       &net_secret);
++	return seq_scale(hash);
++}
++EXPORT_SYMBOL_GPL(secure_tcp_nip_sequence_number);
++
++/* NIP */
++u64 secure_newip_port_ephemeral(const __be32 *saddr, const __be32 *daddr,
++				__be16 dport)
++{
++	const struct {
++		struct nip_addr saddr;
++		struct nip_addr daddr;
++		__be16 dport;
++	} __aligned(SIPHASH_ALIGNMENT) combined = {
++		.saddr = *(struct nip_addr *)saddr,
++		.daddr = *(struct nip_addr *)daddr,
++		.dport = dport,
++	};
++	net_secret_init();
++	return siphash(&combined, offsetofend(typeof(combined), dport),
++		       &net_secret);
++}
++EXPORT_SYMBOL_GPL(secure_newip_port_ephemeral);
++#endif
++
+ #if IS_ENABLED(CONFIG_IP_DCCP)
+ u64 secure_dccp_sequence_number(__be32 saddr, __be32 daddr,
+ 				__be16 sport, __be16 dport)
+diff -Naur old/net/ipv4/inet_connection_sock.c new/net/ipv4/inet_connection_sock.c
+--- old/net/ipv4/inet_connection_sock.c	2022-07-23 18:52:45.646073630 +0800
++++ new/net/ipv4/inet_connection_sock.c	2022-07-23 18:52:45.676073630 +0800
+@@ -22,7 +22,34 @@
+ #include <net/tcp.h>
+ #include <net/sock_reuseport.h>
+ #include <net/addrconf.h>
++#if IS_ENABLED(CONFIG_NEWIP)
++#include <linux/nip_addr.h>
++#include <net/nip.h>
++#endif
+ 
++#if IS_ENABLED(CONFIG_NEWIP)
++/* only match New IP sock
++ * match_sk*_wildcard == true:  NIP_ADDR_ANY equals to any New IP addresses
++ *
++ * match_sk*_wildcard == false: addresses must be exactly the same, i.e.
++ *				NIP_ADDR_ANY only equals to NIP_ADDR_ANY
++ */
++static bool nip_rcv_saddr_equal(const struct nip_addr *sk1_rcv_saddr,
++				const struct nip_addr *sk2_rcv_saddr,
++				bool sk2_isnewip,
++				bool match_sk1_wildcard,
++				bool match_sk2_wildcard)
++{
++	if (!sk2_isnewip)
++		return false;
++	if (nip_addr_eq(sk1_rcv_saddr, sk2_rcv_saddr))
++		return true;
++	return (match_sk1_wildcard &&
++		nip_addr_eq(sk1_rcv_saddr, &nip_any_addr)) ||
++		(match_sk2_wildcard &&
++		 nip_addr_eq(sk2_rcv_saddr, &nip_any_addr));
++}
++#endif
+ #if IS_ENABLED(CONFIG_IPV6)
+ /* match_sk*_wildcard == true:  IPV6_ADDR_ANY equals to any IPv6 addresses
+  *				if IPv6 only, and any IPv4 addresses
+@@ -102,6 +129,16 @@
+ 					    match_wildcard,
+ 					    match_wildcard);
+ #endif
++
++#if IS_ENABLED(CONFIG_NEWIP)
++	if (sk->sk_family == AF_NINET)
++		return nip_rcv_saddr_equal(&sk->sk_nip_rcv_saddr,
++					   &sk2->sk_nip_rcv_saddr,
++					   sk2->sk_family == AF_NINET,
++					   match_wildcard,
++					   match_wildcard);
++#endif
++
+ 	return ipv4_rcv_saddr_equal(sk->sk_rcv_saddr, sk2->sk_rcv_saddr,
+ 				    ipv6_only_sock(sk2), match_wildcard,
+ 				    match_wildcard);
+@@ -292,6 +329,13 @@
+ 					    tb->fast_ipv6_only,
+ 					    ipv6_only_sock(sk), true, false);
+ #endif
++#if IS_ENABLED(CONFIG_NEWIP)
++	if (tb->fast_sk_family == AF_NINET)
++		return nip_rcv_saddr_equal(&tb->fast_nip_rcv_saddr,
++					   &sk->sk_nip_rcv_saddr,
++					   sk->sk_family == AF_NINET,
++					   true, false);
++#endif
+ 	return ipv4_rcv_saddr_equal(tb->fast_rcv_saddr, sk->sk_rcv_saddr,
+ 				    ipv6_only_sock(sk), true, false);
+ }
+@@ -313,6 +357,9 @@
+ #if IS_ENABLED(CONFIG_IPV6)
+ 			tb->fast_v6_rcv_saddr = sk->sk_v6_rcv_saddr;
+ #endif
++#if IS_ENABLED(CONFIG_NEWIP)
++			tb->fast_nip_rcv_saddr = sk->sk_nip_rcv_saddr;
++#endif
+ 		} else {
+ 			tb->fastreuseport = 0;
+ 		}
+@@ -340,6 +387,9 @@
+ #if IS_ENABLED(CONFIG_IPV6)
+ 				tb->fast_v6_rcv_saddr = sk->sk_v6_rcv_saddr;
+ #endif
++#if IS_ENABLED(CONFIG_NEWIP)
++				tb->fast_nip_rcv_saddr = sk->sk_nip_rcv_saddr;
++#endif
+ 			}
+ 		} else {
+ 			tb->fastreuseport = 0;
+diff -Naur old/net/ipv4/inet_hashtables.c new/net/ipv4/inet_hashtables.c
+--- old/net/ipv4/inet_hashtables.c	2022-07-23 18:52:45.656073630 +0800
++++ new/net/ipv4/inet_hashtables.c	2022-07-23 18:52:45.676073630 +0800
+@@ -52,6 +52,15 @@
+ 				     &sk->sk_v6_rcv_saddr, sk->sk_num,
+ 				     &sk->sk_v6_daddr, sk->sk_dport);
+ #endif
++
++#if IS_ENABLED(CONFIG_NEWIP)
++	/* NIP */
++	if (sk->sk_family == AF_NINET)
++		return ninet_ehashfn(sock_net(sk),
++				     &sk->sk_nip_rcv_saddr, sk->sk_num,
++				     &sk->sk_nip_daddr, sk->sk_dport);
++#endif
++
+ 	return inet_ehashfn(sock_net(sk),
+ 			    sk->sk_rcv_saddr, sk->sk_num,
+ 			    sk->sk_daddr, sk->sk_dport);
+diff -Naur old/security/selinux/hooks.c new/security/selinux/hooks.c
+--- old/security/selinux/hooks.c	2022-07-23 18:52:45.656073630 +0800
++++ new/security/selinux/hooks.c	2022-07-23 18:52:45.676073630 +0800
+@@ -1271,7 +1271,7 @@
+ 			return SECCLASS_SMC_SOCKET;
+ 		case PF_XDP:
+ 			return SECCLASS_XDP_SOCKET;
+-#if PF_MAX > 45
++#if PF_MAX > 46
+ #error New address family defined, please update this function.
+ #endif
+ 		}
+diff -Naur old/security/selinux/include/classmap.h new/security/selinux/include/classmap.h
+--- old/security/selinux/include/classmap.h	2022-07-23 18:52:45.656073630 +0800
++++ new/security/selinux/include/classmap.h	2022-07-23 18:52:45.676073630 +0800
+@@ -253,6 +253,6 @@
+ 	{ NULL }
+   };
+ 
+-#if PF_MAX > 45
++#if PF_MAX > 46
+ #error New address family defined, please update secclass_map.
+ #endif

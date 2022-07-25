@@ -27,7 +27,7 @@
 #ifndef _NIP_CHECKSUM_H
 #define _NIP_CHECKSUM_H
 
-#include <linux/nip_addr.h>
+#include "nip_addr.h"
 
 struct nip_pseudo_header {
 	struct nip_addr saddr;    /* Source address, network order.(big end) */
