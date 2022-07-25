@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# Copyright (c) 2022 Huawei Device Co., Ltd.
+#
+# NewIP configuration
+#
+
+# NewIP as module will cause a CRASH if you try to unload it
+menuconfig NEWIP
+	tristate "The NewIP protocol"
+	default y
+	help
+	Support for NewIP.
+
+	To compile this protocol support as a module, choose M here: the
+	module will be called NewIP.
