@@ -754,6 +754,8 @@ static int tcp_nip_init_sock(struct sock *sk)
 	tp->nip_keepalive_enable = false;
 	tp->idle_ka_probes_out = 0;
 	tp->nip_keepalive_timeout_scale = 0;
+	tp->last_rcv_nxt = 0;
+	tp->dup_ack_cnt = 0;
 
 	tp->reordering = sock_net(sk)->ipv4.sysctl_tcp_reordering;
 	tp->tsoffset = 0;

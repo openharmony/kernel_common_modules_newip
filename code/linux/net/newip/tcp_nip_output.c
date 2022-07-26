@@ -526,8 +526,9 @@ static int __tcp_nip_transmit_skb(struct sock *sk, struct sk_buff *skb,
 		    tcb->tcp_flags);
 	*(((__be16 *)th) + TCP_HDR_LEN_OFFSET) = len;
 
-	th->check		= 0;
-	th->urg_ptr		= 0;
+	th->check = 0;
+	/* Newip Urg_ptr is disabled. Urg_ptr is used to carry the number of discarded packets */
+	th->urg_ptr = htons(tp->snd_up);
 
 	/* Write TCP option */
 	tcp_nip_options_write((__be32 *)(th + 1), tp, &opts);

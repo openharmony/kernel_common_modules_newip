@@ -11,7 +11,7 @@
 #include <asm/byteorder.h>
 #include <linux/libc-compat.h>
 #include <linux/types.h>
-#include <linux/nip_addr.h>
+#include "nip_addr.h"
 #include <linux/if.h>
 
 struct nip_ifreq {

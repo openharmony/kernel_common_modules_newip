@@ -38,7 +38,6 @@ function main()
 	cp -arfL $OHOS_SOURCE_ROOT/foundation/communication/sfc/newip/code/common/*.h  net/newip/
 	cp -arfL $OHOS_SOURCE_ROOT/foundation/communication/sfc/newip/code/common/*.c  net/newip/
 	ln -s -f $KERNEL_BUILD_ROOT/net/newip/nip_addr.h $KERNEL_BUILD_ROOT/include/uapi/linux/nip_addr.h
-	ln -s -f $KERNEL_BUILD_ROOT/net/newip/nip_addr.h $KERNEL_BUILD_ROOT/include/linux/nip_addr.h
 
     cd -
 }

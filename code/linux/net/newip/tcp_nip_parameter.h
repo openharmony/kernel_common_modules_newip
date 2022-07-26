@@ -58,7 +58,7 @@ do { \
 /*********************************************************************************************/
 extern int g_dup_ack_retrans_num;
 extern int g_ack_retrans_num;
-extern int g_retrans_seg_end_divisor;
+extern int g_dup_ack_snd_max;
 
 /*********************************************************************************************/
 /*                            RTT timestamp parameters                                       */

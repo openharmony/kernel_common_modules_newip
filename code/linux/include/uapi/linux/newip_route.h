@@ -14,7 +14,7 @@
 #ifndef _UAPI_LINUX_NEWIP_ROUTE_H
 #define _UAPI_LINUX_NEWIP_ROUTE_H
 
-#include <uapi/linux/nip_addr.h>
+#include "nip_addr.h"
 
 struct nip_rtmsg {
 	struct nip_addr rtmsg_dst;

@@ -88,9 +88,8 @@ module_param_named(dup_ack_retrans_num, g_dup_ack_retrans_num, int, 0644);
 int g_ack_retrans_num = 5;
 module_param_named(ack_retrans_num, g_ack_retrans_num, int, 0644);
 
-/* Ack retransmission seg retransmission divisor */
-int g_retrans_seg_end_divisor = 1;
-module_param_named(retrans_seg_end_divisor, g_retrans_seg_end_divisor, int, 0644);
+int g_dup_ack_snd_max = 6;
+module_param_named(dup_ack_snd_max, g_dup_ack_snd_max, int, 0644);
 
 /*********************************************************************************************/
 /*                            RTT timestamp parameters                                       */

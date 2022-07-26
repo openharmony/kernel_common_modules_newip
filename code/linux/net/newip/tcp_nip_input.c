@@ -207,10 +207,16 @@ static void tcp_drop(struct sock *sk, struct sk_buff *skb)
 	__kfree_skb(skb);
 }
 
+#define PKT_DISCARD_MAX 500
 static void tcp_nip_data_queue(struct sock *sk, struct sk_buff *skb)
 {
+	int mss = tcp_nip_current_mss(sk);
 	struct tcp_sock *tp = tcp_sk(sk);
 	struct inet_connection_sock *icsk = inet_csk(sk);
+
+	/* Newip Urg_ptr is disabled. Urg_ptr is used to carry the number of discarded packets */
+	tp->snd_up = (TCP_SKB_CB(skb)->seq - tcp_sk(sk)->rcv_nxt) / mss;
+	tp->snd_up = tp->snd_up > PKT_DISCARD_MAX ? 0 : tp->snd_up;
 
 	if (TCP_SKB_CB(skb)->seq == TCP_SKB_CB(skb)->end_seq) {
 		DEBUG("%s: no data, only handle ack.\n", __func__);
@@ -336,7 +342,18 @@ static void __tcp_nip_ack_snd_check(struct sock *sk, int ofo_possible)
 	     __nip_tcp_select_window(sk) >= tp->rcv_wnd) ||
 	    /* We have out of order data. */
 	    (ofo_possible && tp->nip_out_of_order_queue)) {
-		tcp_nip_send_ack(sk);
+		if (ofo_possible && tp->nip_out_of_order_queue) {
+			if (tp->rcv_nxt == tp->last_rcv_nxt) {
+				tp->dup_ack_cnt++;
+			} else {
+				tp->dup_ack_cnt = 0;
+				tp->last_rcv_nxt = tp->rcv_nxt;
+			}
+			if (tp->dup_ack_cnt < g_dup_ack_snd_max)
+				tcp_nip_send_ack(sk);
+		} else {
+			tcp_nip_send_ack(sk);
+		}
 	} else {
 		/* Else, send delayed ack. */
 		DEBUG("%s: send delayed ack!!", __func__);
@@ -945,18 +962,22 @@ static void tcp_nip_ack_retrans(struct sock *sk, u32 ack, int ack_type, u32 retr
 #define DUP_ACK_RETRANS_START_NUM 3
 #define DIVIDEND_UP 3
 #define DIVIDEND_DOWN 5
-static void tcp_nip_dup_ack_retrans(struct sock *sk, u32 ack, u32 retrans_num)
+static void tcp_nip_dup_ack_retrans(struct sock *sk, const struct sk_buff *skb,
+				    u32 ack, u32 retrans_num)
 {
-	struct tcp_sock *tp = tcp_sk(sk);
-
 	if (tcp_write_queue_head(sk)) {
+		struct tcp_sock *tp = tcp_sk(sk);
+
 		tp->sacked_out++;
 		if (tp->sacked_out == DUP_ACK_RETRANS_START_NUM) {
-			int last_nip_ssthresh = tp->nip_ssthresh;
-			int nip_ssthresh = (tp->nip_ssthresh * DIVIDEND_UP) / DIVIDEND_DOWN;
+			/* Newip Urg_ptr is disabled. Urg_ptr is used to
+			 * carry the number of discarded packets
+			 */
+			int mss = tcp_nip_current_mss(sk);
+			struct tcphdr *th = (struct tcphdr *)skb->data;
+			u16 discard_num = htons(th->urg_ptr);
+			u32 last_nip_ssthresh = tp->nip_ssthresh;
 
-			tp->nip_ssthresh = nip_ssthresh < g_ssthresh_low ?
-					   g_ssthresh_low : nip_ssthresh;
 			if (tp->selective_acks[0].end_seq)
 				SSTHRESH_DBG("%s last retans(%u) not end, seq=%u~%u, pkt_out=%u",
 					     __func__, tp->ack_retrans_num,
@@ -964,14 +985,16 @@ static void tcp_nip_dup_ack_retrans(struct sock *sk, u32 ack, u32 retrans_num)
 					     tp->selective_acks[0].end_seq,
 					     tp->packets_out);
 
-			SSTHRESH_DBG("%s new dup ack, win %u to %u, seq=%u~%u",
-				     __func__, last_nip_ssthresh, tp->nip_ssthresh,
-				     ack, tp->snd_nxt);
-
 			tp->selective_acks[0].start_seq = ack;
-			tp->selective_acks[0].end_seq = tp->snd_nxt;
+			tp->selective_acks[0].end_seq = ack + discard_num * mss;
 			tp->ack_retrans_seq = ack;
 			tp->ack_retrans_num = 0;
+
+			tp->nip_ssthresh = g_ssthresh_low;
+			SSTHRESH_DBG("%s new dup ack, win %u to %u, discard_num=%u, seq=%u~%u",
+				     __func__, last_nip_ssthresh, tp->nip_ssthresh, discard_num,
+				     tp->selective_acks[0].start_seq,
+				     tp->selective_acks[0].end_seq);
 
 			tcp_nip_ack_retrans(sk, ack, DUP_ACK, retrans_num);
 		}
@@ -983,9 +1006,7 @@ static void tcp_nip_nor_ack_retrans(struct sock *sk, u32 ack, u32 retrans_num)
 	struct tcp_sock *tp = tcp_sk(sk);
 
 	if (tp->selective_acks[0].end_seq != 0) {
-		if (ack >= tp->selective_acks[0].end_seq ||
-		    (ack >= ((tp->selective_acks[0].end_seq - tp->selective_acks[0].start_seq) /
-		    g_retrans_seg_end_divisor) + tp->selective_acks[0].start_seq)) {
+		if (ack >= tp->selective_acks[0].end_seq) {
 			SSTHRESH_DBG("%s nor ack retrans(%u) resume, seq=%u~%u, pkt_out=%u, ack=%u",
 				     __func__, tp->ack_retrans_num,
 				     tp->selective_acks[0].start_seq,
@@ -1114,8 +1135,8 @@ static int tcp_nip_ack(struct sock *sk, const struct sk_buff *skb, int flag)
 		return 1;
 	}
 
-	// ack == tp->snd_una
-	tcp_nip_dup_ack_retrans(sk, ack, g_dup_ack_retrans_num);
+	// dup ack: ack == tp->snd_una
+	tcp_nip_dup_ack_retrans(sk, skb, ack, g_dup_ack_retrans_num);
 
 	return 1;
 }
