@@ -2,8 +2,7 @@
 #
 # Copyright (c) 2022 Huawei Device Co., Ltd.
 #
-# NewIP is dual licensed: you can use it either under the terms of
-# the GPL, or the BSD license, at your option.
+# you can use it under the terms of the GPL V2 and the BSD2 license.
 # See the LICENSE file in directory / of this repository for complete details.
 #
 

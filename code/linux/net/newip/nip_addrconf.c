@@ -671,9 +671,9 @@ static int nip_addrconf_ifdown(struct net_device *dev, bool unregister)
 		spin_lock_bh(&addrconf_hash_lock);
 		hlist_for_each_entry_rcu(ifa, h, addr_lst) {
 			if (ifa->idev == idev) {
-				char addr[NIP_8BIT_ADDR_INDEX_MAX] = {0};
+				char addr[NIP_ADDR_BIT_LEN_MAX] = {0};
 
-				nip_addr_to_str(&ifa->addr, addr, NIP_8BIT_ADDR_INDEX_MAX);
+				nip_addr_to_str(&ifa->addr, addr, NIP_ADDR_BIT_LEN_MAX);
 				DEBUG("%s: clear addr hash table.(addr=%s)", __func__, addr);
 				hlist_del_init_rcu(&ifa->addr_lst);
 			}

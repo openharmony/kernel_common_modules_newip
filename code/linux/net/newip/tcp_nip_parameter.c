@@ -136,9 +136,6 @@ module_param_named(nip_keepalive_time, g_nip_keepalive_time, int, 0644);
 int g_nip_keepalive_intvl = 25;
 module_param_named(nip_keepalive_intvl, g_nip_keepalive_intvl, int, 0644);
 
-int g_nip_keepalive_time_short_pkt = 150;
-module_param_named(nip_keepalive_time_short_pkt, g_nip_keepalive_time_short_pkt, int, 0644);
-
 /*********************************************************************************************/
 /*                            window mode parameters                                         */
 /*********************************************************************************************/

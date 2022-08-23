@@ -1,6 +1,6 @@
 diff -Naur old/include/linux/netdevice.h new/include/linux/netdevice.h
---- old/include/linux/netdevice.h	2022-08-17 10:51:51.503816820 +0800
-+++ new/include/linux/netdevice.h	2022-08-17 10:51:51.533816820 +0800
+--- old/include/linux/netdevice.h	2022-08-23 10:45:41.521257329 +0800
++++ new/include/linux/netdevice.h	2022-08-23 10:45:41.561257329 +0800
 @@ -2016,6 +2016,9 @@
  	struct dn_dev __rcu     *dn_ptr;
  #endif
@@ -11,57 +11,9 @@ diff -Naur old/include/linux/netdevice.h new/include/linux/netdevice.h
  #if IS_ENABLED(CONFIG_AX25)
  	void			*ax25_ptr;
  #endif
-@@ -4214,8 +4217,7 @@
- static inline void __netif_tx_lock(struct netdev_queue *txq, int cpu)
- {
- 	spin_lock(&txq->_xmit_lock);
--	/* Pairs with READ_ONCE() in __dev_queue_xmit() */
--	WRITE_ONCE(txq->xmit_lock_owner, cpu);
-+	txq->xmit_lock_owner = cpu;
- }
- 
- static inline bool __netif_tx_acquire(struct netdev_queue *txq)
-@@ -4232,32 +4234,26 @@
- static inline void __netif_tx_lock_bh(struct netdev_queue *txq)
- {
- 	spin_lock_bh(&txq->_xmit_lock);
--	/* Pairs with READ_ONCE() in __dev_queue_xmit() */
--	WRITE_ONCE(txq->xmit_lock_owner, smp_processor_id());
-+	txq->xmit_lock_owner = smp_processor_id();
- }
- 
- static inline bool __netif_tx_trylock(struct netdev_queue *txq)
- {
- 	bool ok = spin_trylock(&txq->_xmit_lock);
--
--	if (likely(ok)) {
--		/* Pairs with READ_ONCE() in __dev_queue_xmit() */
--		WRITE_ONCE(txq->xmit_lock_owner, smp_processor_id());
--	}
-+	if (likely(ok))
-+		txq->xmit_lock_owner = smp_processor_id();
- 	return ok;
- }
- 
- static inline void __netif_tx_unlock(struct netdev_queue *txq)
- {
--	/* Pairs with READ_ONCE() in __dev_queue_xmit() */
--	WRITE_ONCE(txq->xmit_lock_owner, -1);
-+	txq->xmit_lock_owner = -1;
- 	spin_unlock(&txq->_xmit_lock);
- }
- 
- static inline void __netif_tx_unlock_bh(struct netdev_queue *txq)
- {
--	/* Pairs with READ_ONCE() in __dev_queue_xmit() */
--	WRITE_ONCE(txq->xmit_lock_owner, -1);
-+	txq->xmit_lock_owner = -1;
- 	spin_unlock_bh(&txq->_xmit_lock);
- }
- 
 diff -Naur old/include/linux/socket.h new/include/linux/socket.h
---- old/include/linux/socket.h	2022-08-17 10:51:51.503816820 +0800
-+++ new/include/linux/socket.h	2022-08-17 10:51:51.533816820 +0800
+--- old/include/linux/socket.h	2022-08-23 10:45:41.521257329 +0800
++++ new/include/linux/socket.h	2022-08-23 10:45:41.561257329 +0800
 @@ -223,8 +223,8 @@
  				 * reuses AF_INET address family
  				 */
@@ -82,8 +34,8 @@ diff -Naur old/include/linux/socket.h new/include/linux/socket.h
  
  /* Maximum queue length specifiable by listen.  */
 diff -Naur old/include/linux/tcp.h new/include/linux/tcp.h
---- old/include/linux/tcp.h	2022-08-17 10:51:51.503816820 +0800
-+++ new/include/linux/tcp.h	2022-08-17 10:51:51.533816820 +0800
+--- old/include/linux/tcp.h	2022-08-23 10:45:41.531257329 +0800
++++ new/include/linux/tcp.h	2022-08-23 10:45:41.561257329 +0800
 @@ -317,6 +317,9 @@
  
  	/* OOO segments go in this rbtree. Socket lock must be held. */
@@ -129,8 +81,8 @@ diff -Naur old/include/linux/tcp.h new/include/linux/tcp.h
  
  enum tsq_flags {
 diff -Naur old/include/net/dst.h new/include/net/dst.h
---- old/include/net/dst.h	2022-08-17 10:51:51.503816820 +0800
-+++ new/include/net/dst.h	2022-08-17 10:51:51.533816820 +0800
+--- old/include/net/dst.h	2022-08-23 10:45:41.531257329 +0800
++++ new/include/net/dst.h	2022-08-23 10:45:41.561257329 +0800
 @@ -35,6 +35,8 @@
  	int			(*output)(struct net *net, struct sock *sk, struct sk_buff *skb);
  
@@ -141,8 +93,8 @@ diff -Naur old/include/net/dst.h new/include/net/dst.h
  #define DST_NOPOLICY		0x0004
  #define DST_NOCOUNT		0x0008
 diff -Naur old/include/net/inet_hashtables.h new/include/net/inet_hashtables.h
---- old/include/net/inet_hashtables.h	2022-08-17 10:51:51.503816820 +0800
-+++ new/include/net/inet_hashtables.h	2022-08-17 10:51:51.533816820 +0800
+--- old/include/net/inet_hashtables.h	2022-08-23 10:45:41.531257329 +0800
++++ new/include/net/inet_hashtables.h	2022-08-23 10:45:41.561257329 +0800
 @@ -83,6 +83,9 @@
  #if IS_ENABLED(CONFIG_IPV6)
  	struct in6_addr		fast_v6_rcv_saddr;
@@ -168,8 +120,8 @@ diff -Naur old/include/net/inet_hashtables.h new/include/net/inet_hashtables.h
  {
  	sk->sk_daddr = addr; /* alias of inet_daddr */
 diff -Naur old/include/net/inet_sock.h new/include/net/inet_sock.h
---- old/include/net/inet_sock.h	2022-08-17 10:51:51.503816820 +0800
-+++ new/include/net/inet_sock.h	2022-08-17 10:51:51.533816820 +0800
+--- old/include/net/inet_sock.h	2022-08-23 10:45:41.531257329 +0800
++++ new/include/net/inet_sock.h	2022-08-23 10:45:41.561257329 +0800
 @@ -73,6 +73,10 @@
  #define ir_rmt_port		req.__req_common.skc_dport
  #define ir_v6_rmt_addr		req.__req_common.skc_v6_daddr
@@ -195,8 +147,8 @@ diff -Naur old/include/net/inet_sock.h new/include/net/inet_sock.h
  };
  
 diff -Naur old/include/net/neighbour.h new/include/net/neighbour.h
---- old/include/net/neighbour.h	2022-08-17 10:51:51.503816820 +0800
-+++ new/include/net/neighbour.h	2022-08-17 10:51:51.533816820 +0800
+--- old/include/net/neighbour.h	2022-08-23 10:45:41.531257329 +0800
++++ new/include/net/neighbour.h	2022-08-23 10:45:41.571257329 +0800
 @@ -232,6 +232,9 @@
  	NEIGH_ARP_TABLE = 0,
  	NEIGH_ND_TABLE = 1,
@@ -208,8 +160,8 @@ diff -Naur old/include/net/neighbour.h new/include/net/neighbour.h
  	NEIGH_LINK_TABLE = NEIGH_NR_TABLES /* Pseudo table for neigh_xmit */
  };
 diff -Naur old/include/net/net_namespace.h new/include/net/net_namespace.h
---- old/include/net/net_namespace.h	2022-08-17 10:51:51.503816820 +0800
-+++ new/include/net/net_namespace.h	2022-08-17 10:51:51.533816820 +0800
+--- old/include/net/net_namespace.h	2022-08-23 10:45:41.531257329 +0800
++++ new/include/net/net_namespace.h	2022-08-23 10:45:41.571257329 +0800
 @@ -38,6 +38,9 @@
  #include <linux/idr.h>
  #include <linux/skbuff.h>
@@ -231,8 +183,8 @@ diff -Naur old/include/net/net_namespace.h new/include/net/net_namespace.h
  	struct netns_ieee802154_lowpan	ieee802154_lowpan;
  #endif
 diff -Naur old/include/net/secure_seq.h new/include/net/secure_seq.h
---- old/include/net/secure_seq.h	2022-08-17 10:51:51.503816820 +0800
-+++ new/include/net/secure_seq.h	2022-08-17 10:51:51.533816820 +0800
+--- old/include/net/secure_seq.h	2022-08-23 10:45:41.531257329 +0800
++++ new/include/net/secure_seq.h	2022-08-23 10:45:41.571257329 +0800
 @@ -19,4 +19,11 @@
  u64 secure_dccpv6_sequence_number(__be32 *saddr, __be32 *daddr,
  				  __be16 sport, __be16 dport);
@@ -246,8 +198,8 @@ diff -Naur old/include/net/secure_seq.h new/include/net/secure_seq.h
 +#endif
  #endif /* _NET_SECURE_SEQ */
 diff -Naur old/include/net/sock.h new/include/net/sock.h
---- old/include/net/sock.h	2022-08-17 10:51:51.503816820 +0800
-+++ new/include/net/sock.h	2022-08-17 10:51:51.533816820 +0800
+--- old/include/net/sock.h	2022-08-23 10:45:41.541257329 +0800
++++ new/include/net/sock.h	2022-08-23 10:45:41.571257329 +0800
 @@ -68,6 +68,9 @@
  #include <net/tcp_states.h>
  #include <linux/net_tstamp.h>
@@ -279,37 +231,9 @@ diff -Naur old/include/net/sock.h new/include/net/sock.h
  #define sk_cookie		__sk_common.skc_cookie
  #define sk_incoming_cpu		__sk_common.skc_incoming_cpu
  #define sk_flags		__sk_common.skc_flags
-@@ -2322,22 +2332,19 @@
-  * @sk: socket
-  *
-  * Use the per task page_frag instead of the per socket one for
-- * optimization when we know that we're in process context and own
-+ * optimization when we know that we're in the normal context and owns
-  * everything that's associated with %current.
-  *
-- * Both direct reclaim and page faults can nest inside other
-- * socket operations and end up recursing into sk_page_frag()
-- * while it's already in use: explicitly avoid task page_frag
-- * usage if the caller is potentially doing any of them.
-- * This assumes that page fault handlers use the GFP_NOFS flags.
-+ * gfpflags_allow_blocking() isn't enough here as direct reclaim may nest
-+ * inside other socket operations and end up recursing into sk_page_frag()
-+ * while it's already in use.
-  *
-  * Return: a per task page_frag if context allows that,
-  * otherwise a per socket one.
-  */
- static inline struct page_frag *sk_page_frag(struct sock *sk)
- {
--	if ((sk->sk_allocation & (__GFP_DIRECT_RECLAIM | __GFP_MEMALLOC | __GFP_FS)) ==
--	    (__GFP_DIRECT_RECLAIM | __GFP_FS))
-+	if (gfpflags_normal_context(sk->sk_allocation))
- 		return &current->task_frag;
- 
- 	return &sk->sk_frag;
 diff -Naur old/include/net/tcp.h new/include/net/tcp.h
---- old/include/net/tcp.h	2022-08-17 10:51:51.513816820 +0800
-+++ new/include/net/tcp.h	2022-08-17 10:51:51.533816820 +0800
+--- old/include/net/tcp.h	2022-08-23 10:45:41.541257329 +0800
++++ new/include/net/tcp.h	2022-08-23 10:45:41.571257329 +0800
 @@ -40,7 +40,9 @@
  #include <net/inet_ecn.h>
  #include <net/dst.h>
@@ -332,8 +256,8 @@ diff -Naur old/include/net/tcp.h new/include/net/tcp.h
  		struct {
  			__u32 flags;
 diff -Naur old/include/uapi/linux/if_ether.h new/include/uapi/linux/if_ether.h
---- old/include/uapi/linux/if_ether.h	2022-08-17 10:51:51.513816820 +0800
-+++ new/include/uapi/linux/if_ether.h	2022-08-17 10:51:51.533816820 +0800
+--- old/include/uapi/linux/if_ether.h	2022-08-23 10:45:41.541257329 +0800
++++ new/include/uapi/linux/if_ether.h	2022-08-23 10:45:41.571257329 +0800
 @@ -72,6 +72,7 @@
  #define ETH_P_ERSPAN	0x88BE		/* ERSPAN type II		*/
  #define ETH_P_IPX	0x8137		/* IPX over DIX			*/
@@ -343,8 +267,8 @@ diff -Naur old/include/uapi/linux/if_ether.h new/include/uapi/linux/if_ether.h
  #define ETH_P_SLOW	0x8809		/* Slow Protocol. See 802.3ad 43B */
  #define ETH_P_WCCP	0x883E		/* Web-cache coordination protocol
 diff -Naur old/net/Kconfig new/net/Kconfig
---- old/net/Kconfig	2022-08-17 10:51:51.513816820 +0800
-+++ new/net/Kconfig	2022-08-17 10:51:51.543816820 +0800
+--- old/net/Kconfig	2022-08-23 10:45:41.551257329 +0800
++++ new/net/Kconfig	2022-08-23 10:45:41.581257329 +0800
 @@ -93,6 +93,7 @@
  if INET
  source "net/ipv4/Kconfig"
@@ -354,8 +278,8 @@ diff -Naur old/net/Kconfig new/net/Kconfig
  source "net/mptcp/Kconfig"
  
 diff -Naur old/net/Makefile new/net/Makefile
---- old/net/Makefile	2022-08-17 10:51:51.513816820 +0800
-+++ new/net/Makefile	2022-08-17 10:51:51.543816820 +0800
+--- old/net/Makefile	2022-08-23 10:45:41.551257329 +0800
++++ new/net/Makefile	2022-08-23 10:45:41.581257329 +0800
 @@ -20,6 +20,7 @@
  obj-$(CONFIG_XFRM)		+= xfrm/
  obj-$(CONFIG_UNIX_SCM)		+= unix/
@@ -365,22 +289,9 @@ diff -Naur old/net/Makefile new/net/Makefile
  obj-$(CONFIG_PACKET)		+= packet/
  obj-$(CONFIG_NET_KEY)		+= key/
 diff -Naur old/net/core/neighbour.c new/net/core/neighbour.c
---- old/net/core/neighbour.c	2022-08-17 10:51:51.513816820 +0800
-+++ new/net/core/neighbour.c	2022-08-17 10:51:51.533816820 +0800
-@@ -734,10 +734,11 @@
- 
- 	ASSERT_RTNL();
- 
--	n = kzalloc(sizeof(*n) + key_len, GFP_KERNEL);
-+	n = kmalloc(sizeof(*n) + key_len, GFP_KERNEL);
- 	if (!n)
- 		goto out;
- 
-+	n->protocol = 0;
- 	write_pnet(&n->net, net);
- 	memcpy(n->key, pkey, key_len);
- 	n->dev = dev;
-@@ -1778,6 +1779,11 @@
+--- old/net/core/neighbour.c	2022-08-23 10:45:41.541257329 +0800
++++ new/net/core/neighbour.c	2022-08-23 10:45:41.571257329 +0800
+@@ -1778,6 +1778,11 @@
  	case AF_DECnet:
  		tbl = neigh_tables[NEIGH_DN_TABLE];
  		break;
@@ -393,8 +304,8 @@ diff -Naur old/net/core/neighbour.c new/net/core/neighbour.c
  
  	return tbl;
 diff -Naur old/net/core/secure_seq.c new/net/core/secure_seq.c
---- old/net/core/secure_seq.c	2022-08-17 10:51:51.513816820 +0800
-+++ new/net/core/secure_seq.c	2022-08-17 10:51:51.533816820 +0800
+--- old/net/core/secure_seq.c	2022-08-23 10:45:41.541257329 +0800
++++ new/net/core/secure_seq.c	2022-08-23 10:45:41.571257329 +0800
 @@ -151,6 +151,51 @@
  EXPORT_SYMBOL_GPL(secure_ipv4_port_ephemeral);
  #endif
@@ -448,8 +359,8 @@ diff -Naur old/net/core/secure_seq.c new/net/core/secure_seq.c
  u64 secure_dccp_sequence_number(__be32 saddr, __be32 daddr,
  				__be16 sport, __be16 dport)
 diff -Naur old/net/ipv4/inet_connection_sock.c new/net/ipv4/inet_connection_sock.c
---- old/net/ipv4/inet_connection_sock.c	2022-08-17 10:51:51.513816820 +0800
-+++ new/net/ipv4/inet_connection_sock.c	2022-08-17 10:51:51.533816820 +0800
+--- old/net/ipv4/inet_connection_sock.c	2022-08-23 10:45:41.541257329 +0800
++++ new/net/ipv4/inet_connection_sock.c	2022-08-23 10:45:41.571257329 +0800
 @@ -22,7 +22,34 @@
  #include <net/tcp.h>
  #include <net/sock_reuseport.h>
@@ -537,8 +448,8 @@ diff -Naur old/net/ipv4/inet_connection_sock.c new/net/ipv4/inet_connection_sock
  		} else {
  			tb->fastreuseport = 0;
 diff -Naur old/net/ipv4/inet_hashtables.c new/net/ipv4/inet_hashtables.c
---- old/net/ipv4/inet_hashtables.c	2022-08-17 10:51:51.513816820 +0800
-+++ new/net/ipv4/inet_hashtables.c	2022-08-17 10:51:51.543816820 +0800
+--- old/net/ipv4/inet_hashtables.c	2022-08-23 10:45:41.541257329 +0800
++++ new/net/ipv4/inet_hashtables.c	2022-08-23 10:45:41.581257329 +0800
 @@ -52,6 +52,15 @@
  				     &sk->sk_v6_rcv_saddr, sk->sk_num,
  				     &sk->sk_v6_daddr, sk->sk_dport);
@@ -556,8 +467,8 @@ diff -Naur old/net/ipv4/inet_hashtables.c new/net/ipv4/inet_hashtables.c
  			    sk->sk_rcv_saddr, sk->sk_num,
  			    sk->sk_daddr, sk->sk_dport);
 diff -Naur old/security/selinux/hooks.c new/security/selinux/hooks.c
---- old/security/selinux/hooks.c	2022-08-17 10:51:51.523816820 +0800
-+++ new/security/selinux/hooks.c	2022-08-17 10:51:51.543816820 +0800
+--- old/security/selinux/hooks.c	2022-08-23 10:45:41.551257329 +0800
++++ new/security/selinux/hooks.c	2022-08-23 10:45:41.581257329 +0800
 @@ -1271,7 +1271,7 @@
  			return SECCLASS_SMC_SOCKET;
  		case PF_XDP:
@@ -567,18 +478,9 @@ diff -Naur old/security/selinux/hooks.c new/security/selinux/hooks.c
  #error New address family defined, please update this function.
  #endif
  		}
-@@ -5665,7 +5665,7 @@
- 	struct common_audit_data ad;
- 	struct lsm_network_audit net = {0,};
- 	char *addrp;
--	u8 proto = 0;
-+	u8 proto;
- 
- 	if (sk == NULL)
- 		return NF_ACCEPT;
 diff -Naur old/security/selinux/include/classmap.h new/security/selinux/include/classmap.h
---- old/security/selinux/include/classmap.h	2022-08-17 10:51:51.523816820 +0800
-+++ new/security/selinux/include/classmap.h	2022-08-17 10:51:51.543816820 +0800
+--- old/security/selinux/include/classmap.h	2022-08-23 10:45:41.551257329 +0800
++++ new/security/selinux/include/classmap.h	2022-08-23 10:45:41.581257329 +0800
 @@ -253,6 +253,6 @@
  	{ NULL }
    };

@@ -1083,7 +1083,8 @@ static bool tcp_nip_write_xmit(struct sock *sk, unsigned int mss_now, int nonagl
 	u32 snd_num = g_nip_tcp_snd_win_enable ? (tp->nip_ssthresh / mss_now) : 0xFFFFFFFF;
 	u32 last_nip_ssthresh = tp->nip_ssthresh;
 	bool snd_wnd_ready;
-	const char *str[] = {"can`t send pkt because no window", "have window to send pkt"};
+	static const char * const str[] = {"can`t send pkt because no window",
+					   "have window to send pkt"};
 
 	tcp_nip_keepalive_enable(sk);
 	tp->idle_ka_probes_out = 0;

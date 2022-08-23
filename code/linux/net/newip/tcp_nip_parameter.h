@@ -69,7 +69,6 @@ extern int g_ssthresh_high_step;
 extern int g_nip_idle_ka_probes_out;
 extern int g_nip_keepalive_time;
 extern int g_nip_keepalive_intvl;
-extern int g_nip_keepalive_time_short_pkt;
 
 /*********************************************************************************************/
 /*                            window mode parameters                                         */

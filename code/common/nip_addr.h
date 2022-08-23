@@ -47,7 +47,7 @@ enum nip_addr_check_value {
 	ADDR_FIRST_F1,
 	ADDR_FIRST_F2,
 	ADDR_FIRST_F3,
-	ADDR_FIRST_F4,
+	ADDR_FIRST_FE = 0xFE,
 	ADDR_FIRST_FF = 0xFF,
 	ADDR_SECOND_MIN_DD = 0xDD,
 	ADDR_SECOND_MIN_F1 = 0x14,    /* f1 14 00 */

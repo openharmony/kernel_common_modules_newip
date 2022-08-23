@@ -29,7 +29,7 @@ struct nip_devconf {
  * The common CB structure: struct sk_buff->char cb[48]
  * TCP CB structure       : struct tcp_skb_cb
  * struct tcp_skb_cb->header is union, include IPv4/IPv6/NewIP xx_skb_parm, max size is 24
- * sizeof(struct ninet_skb_parm)=23
+ * sizeof(struct ninet_skb_parm)=19
  * sizeof(struct inet_skb_parm)=24
  * sizeof(struct inet6_skb_parm)=20
  * sizeof(struct tcp_skb_cb->exclude skb_parm)=24 |__ total size is 48, struct sk_buff->char cb[48]
@@ -40,7 +40,6 @@ struct ninet_skb_parm {
 	struct nip_addr dstaddr;
 	struct nip_addr srcaddr;
 	u8 nexthdr;
-	u32 pkt_total_len;
 };
 #pragma pack()
 

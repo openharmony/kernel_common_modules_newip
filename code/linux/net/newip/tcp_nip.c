@@ -685,17 +685,11 @@ static int tcp_nip_keepalive_para_update(struct sock *sk,
 void tcp_nip_keepalive_enable(struct sock *sk)
 {
 	int ret;
-	u32 nip_keepalive_time;
-	u32 pkt_len;
 	struct tcp_sock *tp = tcp_sk(sk);
 	struct sk_buff *skb = tcp_nip_send_head(sk);
 
 	if (!skb)
 		return;
-
-	pkt_len = NIPCB(skb)->pkt_total_len;
-	nip_keepalive_time = pkt_len < NIP_PKT_TOTAL_LEN_BOUNDARY ?
-			     g_nip_keepalive_time_short_pkt : g_nip_keepalive_time;
 
 	if (tp->nip_keepalive_enable) {
 		/* If keepalive set by setsockopt, backup para and change para to nip para */
@@ -706,10 +700,10 @@ void tcp_nip_keepalive_enable(struct sock *sk)
 
 			DEBUG("%s HZ=%u, change time/probes/intvl [%u, %u, %u] to [%u, %u, %u]",
 			      __func__, HZ, tp->keepalive_time, tp->keepalive_probes,
-			      tp->keepalive_intvl, nip_keepalive_time, NIP_KEEPALIVE_PROBES,
+			      tp->keepalive_intvl, g_nip_keepalive_time, NIP_KEEPALIVE_PROBES,
 			      g_nip_keepalive_intvl);
 
-			tp->keepalive_time = nip_keepalive_time;
+			tp->keepalive_time = g_nip_keepalive_time;
 			tp->keepalive_probes = NIP_KEEPALIVE_PROBES;
 			tp->keepalive_intvl = g_nip_keepalive_intvl;
 			inet_csk_reset_keepalive_timer(sk, tp->keepalive_time);
@@ -727,7 +721,7 @@ void tcp_nip_keepalive_enable(struct sock *sk)
 	}
 
 	/* change para to nip para */
-	ret = tcp_nip_keepalive_para_update(sk, nip_keepalive_time,
+	ret = tcp_nip_keepalive_para_update(sk, g_nip_keepalive_time,
 					    g_nip_keepalive_intvl,
 					    NIP_KEEPALIVE_PROBES);
 	if (ret != 0) {
@@ -736,9 +730,9 @@ void tcp_nip_keepalive_enable(struct sock *sk)
 		return;
 	}
 
-	pr_crit("%s ok, HZ=%u, time/probes/intvl [%u, %u, %u], pkt_total_len=%u",
+	pr_crit("%s ok, HZ=%u, time/probes/intvl [%u, %u, %u]",
 		__func__, HZ, tp->keepalive_time, tp->keepalive_probes,
-		tp->keepalive_intvl, pkt_len);
+		tp->keepalive_intvl);
 	tp->nip_keepalive_enable = true;
 }
 
@@ -967,7 +961,6 @@ restart:
 
 		skb->tstamp = 0;
 		process_backlog = true;
-		NIPCB(skb)->pkt_total_len = size;
 
 		skb_nip_entail(sk, skb);
 		copy = mss_now;
