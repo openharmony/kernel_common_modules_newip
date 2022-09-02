@@ -1,64 +1,109 @@
-/* SPDX-License-Identifier: GPL-2.0+ WITH Linux-syscall-note */
+/* SPDX-License-Identifier: BSD-2-Clause */
 /*
  * Copyright (c) 2022 Huawei Device Co., Ltd.
  *
- * Linux NewIP INET implementation
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version
- * 2 of the License, or (at your option) any later version.
+ * 1. Redistributions of source code must retain the above copyright notice, this list of
+ *    conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright notice, this list
+ *    of conditions and the following disclaimer in the documentation and/or other materials
+ *    provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+ * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+ * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+ * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+ * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #ifndef _NIP_H
 #define _NIP_H
 
-#include <linux/if.h>
+#define NIP_ADDR_LEN_1 1
+#define NIP_ADDR_LEN_2 2
+#define NIP_ADDR_LEN_3 3
+#define NIP_ADDR_LEN_4 4
+#define NIP_ADDR_LEN_5 5
+#define NIP_ADDR_LEN_7 7
+#define NIP_ADDR_LEN_8 8
 
-// AF_NINET可通过读取 /sys/module/newip/parameters/af_ninet 文件来获取类型数值。
-#define PF_NINET 45
-#define AF_NINET PF_NINET
+#define NIP_ADDR_BIT_LEN_8    8
+#define NIP_ADDR_BIT_LEN_16   16
+#define NIP_ADDR_BIT_LEN_24   24
+#define NIP_ADDR_BIT_LEN_40   40
+#define NIP_ADDR_BIT_LEN_MAX  64
 
-#define NIP_BITLEN_MAX 64
+enum nip_8bit_addr_index {
+	NIP_8BIT_ADDR_INDEX_0 = 0,
+	NIP_8BIT_ADDR_INDEX_1 = 1,
+	NIP_8BIT_ADDR_INDEX_2 = 2,
+	NIP_8BIT_ADDR_INDEX_3 = 3,
+	NIP_8BIT_ADDR_INDEX_4 = 4,
+	NIP_8BIT_ADDR_INDEX_5 = 5,
+	NIP_8BIT_ADDR_INDEX_6 = 6,
+	NIP_8BIT_ADDR_INDEX_7 = 7,
+	NIP_8BIT_ADDR_INDEX_MAX,
+};
 
-#define nip_addr_field8 v.u.u8
-#define nip_addr_field16 v.u.u16
-#define nip_addr_field32 v.u.u32
+enum nip_16bit_addr_index {
+	NIP_16BIT_ADDR_INDEX_0 = 0,
+	NIP_16BIT_ADDR_INDEX_1 = 1,
+	NIP_16BIT_ADDR_INDEX_2 = 2,
+	NIP_16BIT_ADDR_INDEX_3 = 3,
+	NIP_16BIT_ADDR_INDEX_MAX,
+};
 
-/* New IP address field */
+enum nip_32bit_addr_index {
+	NIP_32BIT_ADDR_INDEX_0 = 0,
+	NIP_32BIT_ADDR_INDEX_1 = 1,
+	NIP_32BIT_ADDR_INDEX_MAX,
+};
+
+#define nip_addr_field8 v.u.field8
+#define nip_addr_field16 v.u.field16
+#define nip_addr_field32 v.u.field32
+
 #pragma pack(1)
 struct nip_addr_field {
 	union {
-		__u8 u8[8];
-		__be16 u16[4];
-		__be32 u32[2];
+		unsigned char   field8[NIP_8BIT_ADDR_INDEX_MAX];
+		unsigned short field16[NIP_16BIT_ADDR_INDEX_MAX]; /* big-endian */
+		unsigned int   field32[NIP_32BIT_ADDR_INDEX_MAX]; /* big-endian */
 	} u;
 };
-#pragma pack()
 
-/* New IP topology address structure */
-#pragma pack(1)
 struct nip_addr {
-	uint8_t bitlen;		// address bitlength
+	unsigned char bitlen;
 	struct nip_addr_field v;
 };
 #pragma pack()
 
-/* The following structure must be larger than V4. System calls use V4.
- * If the definition is smaller than V4, the read process will have memory overruns
- * v4: include\linux\socket.h --> sockaddr (16Byte)
- */
-#define POD_SOCKADDR_SIZE 3
-struct sockaddr_nin {
-	unsigned short sin_family; /* [2Byte] AF_NINET */
-	unsigned short sin_port;   /* [2Byte] Transport layer port, big-endian */
-	struct nip_addr sin_addr;  /* [9Byte] NIP address */
-
-	unsigned char sin_zero[POD_SOCKADDR_SIZE]; /* [3Byte] Byte alignment */
-};
-
-struct nip_ifreq {
-	struct nip_addr ifrn_addr;
-	int ifrn_ifindex;
+enum nip_index {
+	INDEX_0 = 0,
+	INDEX_1 = 1,
+	INDEX_2 = 2,
+	INDEX_3 = 3,
+	INDEX_4 = 4,
+	INDEX_5 = 5,
+	INDEX_6 = 6,
+	INDEX_7 = 7,
+	INDEX_8 = 8,
+	INDEX_9 = 9,
+	INDEX_10 = 10,
+	INDEX_11 = 11,
+	INDEX_12 = 12,
+	INDEX_13 = 13,
+	INDEX_14 = 14,
+	INDEX_15 = 15,
+	INDEX_MAX,
 };
 
 #endif /*_NIP_H*/

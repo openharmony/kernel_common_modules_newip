@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
-# 
+#
 # Copyright (c) 2022 Huawei Device Co., Ltd.
 #
 # Makefile for the Linux newip layer
@@ -13,7 +13,7 @@ UT_LIST = nip_addr_cfg_demo nip_route_cfg_demo nip_tcp_server_demo nip_tcp_clien
 
 all: $(UT_LIST)
 
-clean: 
+clean:
 	rm -f $(UT_LIST)
 	rm -f nip_api.o
 	rm -f libnip_api.a
