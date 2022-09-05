@@ -1,8 +1,7 @@
-# SPDX-License-Identifier: GPL-2.0-or-later
+# SPDX-License-Identifier: BSD-2-Clause
 #
 # Copyright (c) 2022 Huawei Device Co., Ltd.
 #
-# Makefile for the Linux newip layer
 #
 CC=gcc
 # CC = aarch64-linux-gnu-gcc
@@ -15,19 +14,19 @@ all: $(UT_LIST)
 
 clean:
 	rm -f $(UT_LIST)
-	rm -f nip_api.o
-	rm -f libnip_api.a
+	rm -f nip_lib.o
+	rm -f libnip_lib.a
 
 
 #lib
-NIP_LIB     = libnip_api.a
-NIP_DEF_LIB = -L. -lnip_api
+NIP_LIB     = libnip_lib.a
+NIP_DEF_LIB = -L. -lnip_lib
 
-nip_api.o: nip_api.c
-	$(CC) -c nip_api.c -o nip_api.o
+nip_lib.o: nip_lib.c
+	$(CC) -c nip_lib.c -o nip_lib.o
 
-libnip_api.a: nip_api.o
-	ar -rv libnip_api.a nip_api.o
+libnip_lib.a: nip_lib.o
+	ar -rv libnip_lib.a nip_lib.o
 
 #UT func list
 nip_addr_cfg_demo: nip_addr_cfg_demo.c $(NIP_LIB)

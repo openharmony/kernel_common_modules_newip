@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: BSD-2-Clause */
+// SPDX-License-Identifier: BSD-2-Clause
 /*
  * Copyright (c) 2022 Huawei Device Co., Ltd.
  *
@@ -24,21 +24,38 @@
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef _NEWIP_ROUTE_H
-#define _NEWIP_ROUTE_H
+#include <sys/socket.h>
+#include <sys/ioctl.h>
+#include <string.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <stdint.h>
+#include <linux/if.h>  /* struct ifreq depend */
 
-#include "nip.h"
+#include "nip_uapi.h"
+#include "nip_lib.h"
 
-struct nip_rtmsg {
-	struct nip_addr rtmsg_dst;
-	struct nip_addr rtmsg_src;
-	struct nip_addr rtmsg_gateway;
-	char dev_name[10];
-	unsigned int rtmsg_type;
-	int rtmsg_ifindex;
-	unsigned int rtmsg_metric;
-	unsigned long rtmsg_info;
-	unsigned int rtmsg_flags;
-};
+int32_t nip_get_ifindex(const char *ifname, int *ifindex)
+{
+	int fd;
+	struct ifreq ifr;
 
-#endif /* _NEWIP_ROUTE_H */
+	memset(&ifr, 0, sizeof(ifr));
+	strcpy(ifr.ifr_name, ifname);
+	fd = socket(AF_NINET, SOCK_DGRAM, 0);
+	if (fd < 0) {
+		printf("creat socket fail, ifname=%s\n", ifname);
+		return -1;
+	}
+	if ((ioctl(fd, SIOCGIFINDEX, &ifr)) < 0) {
+		printf("get ifindex fail, ifname=%s\n", ifname);
+		close(fd);
+		return -1;
+	}
+	close(fd);
+
+	printf("%s ifindex=%u\n", ifname, ifr.ifr_ifindex);
+	*ifindex = ifr.ifr_ifindex;
+	return 0;
+}
+

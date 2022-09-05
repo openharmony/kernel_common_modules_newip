@@ -24,21 +24,21 @@
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef _NEWIP_ROUTE_H
-#define _NEWIP_ROUTE_H
+#ifndef _NIP_LIB_H
+#define _NIP_LIB_H
 
-#include "nip.h"
+/* Eth0 and wlan0 are optional. Change the value based on the actual interface */
+#define NIC_NAME "eth0"
 
-struct nip_rtmsg {
-	struct nip_addr rtmsg_dst;
-	struct nip_addr rtmsg_src;
-	struct nip_addr rtmsg_gateway;
-	char dev_name[10];
-	unsigned int rtmsg_type;
-	int rtmsg_ifindex;
-	unsigned int rtmsg_metric;
-	unsigned long rtmsg_info;
-	unsigned int rtmsg_flags;
-};
+#define BUFLEN          2048
+#define LISTEN_MAX      3
+#define PKTCNT          10      // Number of sent packets
+#define PKTLEN          1024    // Length of sent packet
+#define SLEEP_US        500000  // Packet sending interval (ms)
+#define SELECT_TIME     600
+#define TCP_SERVER_PORT 5556    // TCP Server Port
+#define UDP_SERVER_PORT 9090    // UDP Server Port
 
-#endif /* _NEWIP_ROUTE_H */
+int nip_get_ifindex(const char *ifname, int *ifindex);
+
+#endif /* _NIP_LIB_H */
