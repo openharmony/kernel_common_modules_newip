@@ -14,3 +14,12 @@ menuconfig NEWIP
 
 	To compile this protocol support as a module, choose M here: the
 	module will be called NewIP.
+
+if NEWIP
+config NEWIP_FAST_KEEPALIVE
+	tristate "NewIP fast keepalive"
+	default n
+	help
+	  Support for NewIP fast keepalive.
+endif # NEWIP
+

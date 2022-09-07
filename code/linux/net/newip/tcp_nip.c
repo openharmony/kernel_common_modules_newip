@@ -623,6 +623,7 @@ static const struct inet_connection_sock_af_ops newip_specific = {
 	.mtu_reduced	   = NULL,
 };
 
+#if IS_ENABLED(CONFIG_NEWIP_FAST_KEEPALIVE)
 #define MAX_NIP_TCP_KEEPIDLE	32767
 #define MAX_NIP_TCP_KEEPINTVL	32767
 #define MAX_NIP_TCP_KEEPCNT	255
@@ -679,11 +680,13 @@ static int tcp_nip_keepalive_para_update(struct sock *sk,
 
 	return 0;
 }
+#endif
 
 #define NIP_PKT_TOTAL_LEN_BOUNDARY 100000  // 100K
 #define NIP_KEEPALIVE_PROBES 255
 void tcp_nip_keepalive_enable(struct sock *sk)
 {
+#if IS_ENABLED(CONFIG_NEWIP_FAST_KEEPALIVE)
 	int ret;
 	struct tcp_sock *tp = tcp_sk(sk);
 	struct sk_buff *skb = tcp_nip_send_head(sk);
@@ -734,10 +737,12 @@ void tcp_nip_keepalive_enable(struct sock *sk)
 		__func__, HZ, tp->keepalive_time, tp->keepalive_probes,
 		tp->keepalive_intvl);
 	tp->nip_keepalive_enable = true;
+#endif
 }
 
 void tcp_nip_keepalive_disable(struct sock *sk)
 {
+#if IS_ENABLED(CONFIG_NEWIP_FAST_KEEPALIVE)
 	struct tcp_sock *tp = tcp_sk(sk);
 
 	if (!tp->nip_keepalive_enable)
@@ -776,6 +781,7 @@ void tcp_nip_keepalive_disable(struct sock *sk)
 
 	DEBUG("%s ok, HZ=%u, idle_ka_probes_out=%u", __func__, HZ, g_nip_idle_ka_probes_out);
 	tp->nip_keepalive_enable = false;
+#endif
 }
 
 static void tcp_nip_rtt_init(struct sock *sk)

@@ -27,17 +27,22 @@
 #ifndef _NIP_LIB_H
 #define _NIP_LIB_H
 
+/* AF_NINET by reading/sys/module/newip/parameters/af_ninet file to get the type value */
+#define AF_NINET 45
+
+#define DEMO_INPUT_1  2  /* The DEMO program contains one parameter */
+
 /* Eth0 and wlan0 are optional. Change the value based on the actual interface */
 #define NIC_NAME "eth0"
 
 #define BUFLEN          2048
 #define LISTEN_MAX      3
-#define PKTCNT          10      // Number of sent packets
-#define PKTLEN          1024    // Length of sent packet
-#define SLEEP_US        500000  // Packet sending interval (ms)
+#define PKTCNT          10      /* Number of sent packets */
+#define PKTLEN          1024    /* Length of sent packet */
+#define SLEEP_US        500000  /* Packet sending interval (ms) */
 #define SELECT_TIME     600
-#define TCP_SERVER_PORT 5556    // TCP Server Port
-#define UDP_SERVER_PORT 9090    // UDP Server Port
+#define TCP_SERVER_PORT 5556    /* TCP Server Port */
+#define UDP_SERVER_PORT 9090    /* UDP Server Port */
 
 int nip_get_ifindex(const char *ifname, int *ifindex);
 
