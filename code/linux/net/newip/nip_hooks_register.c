@@ -13,7 +13,6 @@ void ninet_ehashfn_hook(void *data, const struct net *net,
 	    const struct nip_addr *faddr, const __be16 fport, u32 *ret)
 {
 	*ret = ninet_ehashfn(net, laddr, lport, faddr, fport);
-	pr_crit("[newip hook] %s ret=%u", __func__, *ret);
 }
 
 int ninet_hooks_register(void)
