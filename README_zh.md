@@ -2,7 +2,9 @@
 
 ## 简介
 
-OpenHarmony目前WiFi协议报文，三层报头和地址开销使得报文开销大，传输效率较低。
+NewIP（Network 2030 and the Future of IP）由网络5.0联盟，向联合国国际电信联盟(ITU)提议的一项新的网络技术新标准，在现有IP能力基础上，基于未来愿景，满足未来智能机器通信为主的全行业互联网和工业互联网需求。
+
+目前WiFi协议报文，三层报头和地址开销使得报文开销大，传输效率较低。
 
 ![image-20220915162621809](figures/image-20220915162621809.png)
 
@@ -11,11 +13,21 @@ IPv4地址长度固定4字节，IPv6地址长度固定16字节。
 IPv4网络层报头长度20~60字节，IPv6网络层报头长度40字节。
 ```
 
-NewIP支持**可变长多语义地址**，**可变长定制化报头封装**，通过精简报文头开销，提升数据传输效率。
+NewIP支持**可变长多语义地址（最短1字节）**，**可变长定制化报头封装（最短5字节）**，通过精简报文头开销，提升数据传输效率。
+
+NewIP报头开销，相比IPv4节省25.9%，相比IPv6节省44.9%。
+
+NewIP载荷传输效率，相比IPv4提高1%，相比IPv6提高2.33%。
+
+| 对比场景       | 报头开销     | 载荷传输效率（WiFi MTU=1500B，BT MTU=255B） |
+| -------------- | ------------ | ------------------------------------------- |
+| IPv4 for WiFi  | 30+8+20=58 B | (1500-58)/1500=96.13%                       |
+| IPv6 for WiFi  | 30+8+40=78 B | (1500-78)/1500=94.8%                        |
+| NewIP for WiFi | 30+8+5=43 B  | (1500-43)/1500=97.13%                       |
 
 ## 系统架构
 
-NewIP内核协议栈架构图如下，用户态调用Socket API创建NewIP socket，采用NewIP极简帧头封装进行收发包。
+NewIP内核协议栈架构图如下，用户态应用程序调用Socket API创建NewIP socket，采用NewIP极简帧头封装进行收发包。
 
 ![image-20220901152539801](figures/image-20220901152539801.png)
 
@@ -45,8 +57,22 @@ NewIP内核协议栈使能，需要在对应款型的内核defconfig文件中设
 kernel\linux\config\linux-5.10\arch\arm64\configs\rk3568_standard_defconfig
 
 ```c
-CONFIG_NEWIP=y
+CONFIG_NEWIP=y          // 使能NewIP内核协议栈
+CONFIG_NEWIP_HOOKS=y    // 使能NewIP内核侵入式修改插桩函数注册，使能NewIP的同时必须使用NewIP插桩功能
 ```
+
+另有部分CONFIG被依赖：
+
+```c
+VENDOR_HOOKS=y          // 使能内核插桩基础框架
+```
+
+备注：
+
+1. 只在Linux 5.10内核上支持NewIP内核协议栈。
+2. 鸿蒙linux内核要求所有原生内核代码侵入式修改，都要修改成插桩方式。
+
+
 
 代码编译完成后，通过下面命令可以确认newip协议栈代码是否使能成功。
 
@@ -65,13 +91,14 @@ out/kernel/OBJ/linux-5.10/net/newip/tcp_nip_output.o
 
 ```c
 # CONFIG_NEWIP is not set
+# CONFIG_NEWIP_HOOKS is not set
 ```
 
 ## 说明
 
 ### 可变长报头格式
 
-NewIP灵活极简报文头如下图所示，通过LLC Header中的EtherType = 0xEADD标识。Bitmap是一组由0和1组成的二进制序列，每个二进制位的数值用于表示特定目标特性的存在性。
+NewIP灵活极简报文头如下图所示，通过LLC Header中的EtherType = 0xEADD标识NewIP灵活极简报文。Bitmap是一组由0和1组成的二进制序列，每个二进制位的数值用于表示特定目标特性的存在性。
 
 ![image-20220915140627223](figures/image-20220915140627223.png)
 
@@ -79,6 +106,33 @@ NewIP灵活极简报文头如下图所示，通过LLC Header中的EtherType = 0x
 
 2)	Bitmap：变长，Bitmap默认为紧跟在Dispatch有效位后面的7比特，Bitmap字段长度可持续扩展。Bitmap最后一位置0表示Bitmap结束，最后一位置1表示Bitmap向后扩展1 Byte，直至最后一位置0。
 3)	Value: 标识字段的值，长度为1 Byte的整数倍，类型及长度由报头字段语义表确定。
+
+**Bitmap字段定义如下：**
+
+| 极简Bitmap标识             | Bitops | 字段长度         | 置位策略       | 备注                                    |
+| -------------------------- | ------ | ---------------- | -------------- | --------------------------------------- |
+| Bitmap 1st Byte:           |        |                  |                |                                         |
+| 标记位Dispatch             | 0      | 不表示具体字段   | 置0            | 0：极简帧，1：普通帧。                  |
+| TTL                        | 1      | 1 Byte           | 置1            | 剩余跳数。                              |
+| Total Length               | 2      | 2 Byte           | UDP置0，TCP置1 | NewIP报文总长度（包含报头长度）。       |
+| Next Header                | 3      | 1 Byte           | 置1            | 协议类型。                              |
+| Reserve                    | 4      | 保留             | 置0            | 保留字段。                              |
+| Dest Address               | 5      | 变长（1~8 Byte） | 置1            | 目的地址。                              |
+| Source Address             | 6      | 变长（1~8 Byte） | 由协议自行确定 | 源地址。                                |
+| 标记位，标志是否有2nd Byte | 7      | 不表示具体字段   |                | 0：bitmap结束，1：后跟另外8bit bitmap。 |
+| Bitmap 2nd Byte:           |        |                  |                |                                         |
+| Header Length              | 0      | 1 Byte           |                | NewIP报头长度。                         |
+| Reserve                    | 1      | 保留             | 置0            |                                         |
+| Reserve                    | 2      | 保留             | 置0            |                                         |
+| Reserve                    | 3      | 保留             | 置0            |                                         |
+| Reserve                    | 4      | 保留             | 置0            |                                         |
+| Reserve                    | 5      | 保留             | 置0            |                                         |
+| Reserve                    | 6      | 保留             | 置0            |                                         |
+| 标记位，标志是否有3rd Byte | 7      | 不表示具体字段   | 置0            | 0：bitmap结束，1：后跟另外8bit bitmap。 |
+
+NewIP数据报头（极简模式）解析遇到新bitmap字段时的处理方法：
+
+仅解析当前版本协议中已定义的bitmap字段，从第一个未知语义的bitmap字段开始，跳过后面的所有bitmap字段，直接通过header length定位到报文开始位置并解析报文。如果报头中携带了未知语义的bitmap字段，且未携带header length字段，则丢弃该数据包。
 
 ### 可变长地址格式
 
@@ -102,6 +156,22 @@ NewIP采用自解释编码，编码格式如下所示：
 | 0xFE       | An 56-bit address is followed                                | 【8字节】0 ~ 72,057,594,037,927,935 (0x**FE**00 0000 0000 0000 ~ 0x**FE**FF FFFF FFFF FFFF) |
 
 ### 接口说明
+
+NewIP协议socket接口列表如下：
+
+| 函数     | 输入                                                         | 输出                                           | 返回值           | 接口具体描述                                                 |
+| -------- | ------------------------------------------------------------ | ---------------------------------------------- | ---------------- | ------------------------------------------------------------ |
+| socket   | int **domain**, int type, int **protocol**                   | NA                                             | Socket句柄sockfd | 创建NewIP 协议类型socket，并返回socket实例所对应的句柄。**domain参数填写 AF_NINET，表示创建NewIP协议类型socket。protocol参数填写IPPROTO_TCP或IPPROTO_UDP**。 |
+| bind     | int sockfd, const **struct sockaddr_nin** *myaddr, socklen_t addrlen | NA                                             | int，返回错误码  | 将创建的socket绑定到指定的IP地址和端口上。**myaddr->sin_family填写AF_NINET**。 |
+| listen   | int socket, int backlog                                      | NA                                             | int，返回错误码  | 服务端监听NewIP地址和端口。                                  |
+| connect  | int sockfd, const **struct sockaddr_nin** *addr, aocklen_t addrlen | NA                                             | int，返回错误码  | 客户端创建至服务端的连接。                                   |
+| accept   | int sockfd, **struct sockaddr_nin** *address, socklen_t *address_len | NA                                             | 返回socket的fd   | 服务端返回已建链成功的socket。                               |
+| send     | int sockfd, const void *msg, int len, unsigned int flags, const **struct sockaddr_nin** *dst_addr, int addrlen | NA                                             | int，返回错误码  | 用于socket已连接的NewIP类型数据发送。                        |
+| recv     | int sockfd, size_t len, int flags, **struct sockaddr_nin** *src_addr, | void  **buf, int* *fromlen                     | int，返回错误码  | 用于socket已连接的NewIP类型数据接收。                        |
+| close    | int sockfd                                                   | NA                                             | int，返回错误码  | 关闭socket，释放资源。                                       |
+| ioctl    | int sockfd, unsigned long cmd, ...                           | NA                                             | int，返回错误码  | 对NewIP协议栈相关信息进行查询或更改。                        |
+| sendto   | int sockfd, const void *msg, int len, unsigned int flags, const **struct sockaddr** *dst_addr, int addrlen | NA                                             | int，返回错误码  | 用于socket无连接的NewIP类型数据发送。                        |
+| recvfrom | int sockfd, size_t len, int flags,                           | void *buf, struct sockaddr *from, int *fromlen | int，返回错误码  | 用于socket无连接的NewIP类型数据接收。                        |
 
 NewIP短地址结构如下：
 
@@ -165,27 +235,9 @@ struct sockaddr_nin {
 };
 ```
 
+### NewIP收发包代码示例
 
-
-NewIP协议socket接口列表如下：
-
-| 函数     | 输入                                                         | 输出                                           | 返回值           | 接口具体描述                                                 |
-| -------- | ------------------------------------------------------------ | ---------------------------------------------- | ---------------- | ------------------------------------------------------------ |
-| socket   | int **domain**, int type, int **protocol**                   | NA                                             | Socket句柄sockfd | 创建NewIP 协议类型socket，并返回socket实例所对应的句柄。**domain参数填写 AF_NINET，表示创建NewIP协议类型socket。protocol参数填写IPPROTO_TCP或IPPROTO_UDP**。 |
-| bind     | int sockfd, const **struct sockaddr_nin** *myaddr, socklen_t addrlen | NA                                             | int，返回错误码  | 将创建的socket绑定到指定的IP地址和端口上。**myaddr->sin_family填写AF_NINET**。 |
-| listen   | int socket, int backlog                                      | NA                                             | int，返回错误码  | 服务端监听NewIP地址和端口                                    |
-| connect  | int sockfd, const **struct sockaddr_nin** *addr, aocklen_t addrlen | NA                                             | int，返回错误码  | 客户端创建至服务端的连接                                     |
-| accept   | int sockfd, **struct sockaddr_nin** *address, socklen_t *address_len | NA                                             | 返回socket的fd   | 服务端返回已建链成功的socket                                 |
-| send     | int sockfd, const void *msg, int len, unsigned int flags, const **struct sockaddr_nin** *dst_addr, int addrlen | NA                                             | int，返回错误码  | 用于socket已连接的NewIP类型数据发送                          |
-| recv     | int sockfd, size_t len, int flags, **struct sockaddr_nin** *src_addr, | void  **buf, int* *fromlen                     | int，返回错误码  | 用于socket已连接的NewIP类型数据接收                          |
-| close    | int sockfd                                                   | NA                                             | int，返回错误码  | 关闭socket，释放资源                                         |
-| ioctl    | int sockfd, unsigned long cmd, ...                           | NA                                             | int，返回错误码  | 对NewIP协议栈相关信息进行查询或更改。                        |
-| sendto   | int sockfd, const void *msg, int len, unsigned int flags, const **struct sockaddr** *dst_addr, int addrlen | NA                                             | int，返回错误码  | 用于socket无连接的NewIP类型数据发送                          |
-| recvfrom | int sockfd, size_t len, int flags,                           | void *buf, struct sockaddr *from, int *fromlen | int，返回错误码  | 用于socket无连接的NewIP类型数据接收                          |
-
-### 使用说明
-
-NewIP可变长地址配置，路由配置，UDP/TCP收发包demo代码链接如下，NewIP协议栈用户态接口使用方法可以参考代码仓demo代码。
+NewIP可变长地址配置，路由配置，UDP/TCP收发包demo代码链接如下，NewIP协议栈用户态接口使用方法可以参考[代码仓examples代码](https://gitee.com/openharmony-sig/communication_sfc_newip/tree/master/examples)。
 
 | 文件名                | 功能                          |
 | --------------------- | ----------------------------- |
