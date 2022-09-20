@@ -66,6 +66,4 @@ struct tcp_nip_sock {
 	struct tcp_sock tcp;
 };
 
-int find_nip_forward_stamp(struct net *net, void __user *arg);
-
 #endif /* _NIP_H */

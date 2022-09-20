@@ -44,7 +44,12 @@
 #include <net/net_namespace.h>
 #include <linux/netlink.h>
 
-MODULE_DESCRIPTION("NewiIP protocol stack for linux");
+#ifdef CONFIG_NEWIP_HOOKS
+#include <trace/hooks/nip_hooks.h>
+#include "nip_hooks_register.h"
+#endif
+
+MODULE_DESCRIPTION("NewIP protocol stack");
 
 /* The inetsw_nip table contains everything that ninet_create needs to
  * build a new socket
@@ -730,6 +735,13 @@ static int __init ninet_init(void)
 		goto nip_packet_fail;
 	}
 
+#ifdef CONFIG_NEWIP_HOOKS
+	err = ninet_hooks_register();
+	if (err) {
+		DEBUG("failed to register to nip hooks");
+		goto nip_packet_fail;
+	}
+#endif
 	DEBUG("NewIP: init newip address family ok!");
 
 out:

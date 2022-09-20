@@ -335,6 +335,7 @@ static inline int nip_tcp_compute_score(struct sock *sk, struct net *net,
 	return score;
 }
 
+/* nip reuseport */
 static struct sock *ninet_lhash2_lookup(struct net *net,
 					struct inet_listen_hashbucket *ilb2,
 					struct sk_buff *skb, int doff,
