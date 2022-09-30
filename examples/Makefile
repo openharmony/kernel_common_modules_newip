@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: BSD-2-Clause
+# SPDX-License-Identifier: BSD-3-Clause
 #
 # Copyright (c) 2022 Huawei Device Co., Ltd.
 #
@@ -8,7 +8,7 @@ CC=gcc
 # CC = arm-linux-gnueabi-gcc
 CFLAGS=-pthread -static -g
 
-UT_LIST = nip_addr_cfg_demo nip_route_cfg_demo nip_tcp_server_demo nip_tcp_client_demo nip_udp_server_demo nip_udp_client_demo
+UT_LIST = nip_addr_cfg_demo nip_route_cfg_demo nip_tcp_server_demo nip_tcp_client_demo nip_udp_server_demo nip_udp_client_demo get_af_ninet check_nip_enable
 
 all: $(UT_LIST)
 
@@ -46,3 +46,9 @@ nip_udp_server_demo: nip_udp_server_demo.c $(NIP_LIB)
 
 nip_udp_client_demo: nip_udp_client_demo.c $(NIP_LIB)
 	$(CC) $(CFLAGS) -o nip_udp_client_demo nip_udp_client_demo.c $(NIP_DEF_LIB)
+
+get_af_ninet: get_af_ninet.c
+	$(CC) $(CFLAGS) -o get_af_ninet get_af_ninet.c
+
+check_nip_enable: check_nip_enable.c
+	$(CC) $(CFLAGS) -o check_nip_enable check_nip_enable.c
