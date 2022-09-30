@@ -71,7 +71,7 @@ Note:If the text contains special characters, please escape them according to th
 				<policyitem type="copyright" name="Huawei Device Co., Ltd." path="src/.*"           desc="huawei copyright"/>
 				<policyitem type="license" name="GPL" path="LICENSE"                                desc="GPL and BSD dual license"/>
 				<policyitem type="license" name="BSD" path="LICENSE"                                desc="GPL and BSD dual license"/>
-				<policyitem type="license" name="GPL" path="tools\wireshark_cfg_for_newip_v1.3.lua" desc="WireShark lua configure for NewIP protocol stack"/>
+				<policyitem type="license" name="GPL" path="tools\wireshark_cfg_for_newip.lua"      desc="WireShark lua configure for NewIP protocol stack"/>
 			</policy>
 		</policylist>
 		<filefilterlist>
