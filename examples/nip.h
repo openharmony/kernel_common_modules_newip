@@ -45,6 +45,20 @@
 #define NIP_ADDR_BIT_LEN_40   40
 #define NIP_ADDR_BIT_LEN_MAX  64
 
+enum nip_addr_check_value {
+	ADDR_FIRST_DC = 0xDC,
+	ADDR_FIRST_F0 = 0xF0,
+	ADDR_FIRST_F1,
+	ADDR_FIRST_F2,
+	ADDR_FIRST_F3,
+	ADDR_FIRST_FE = 0xFE,
+	ADDR_FIRST_FF = 0xFF,
+	ADDR_SECOND_MIN_DD = 0xDD,
+	ADDR_SECOND_MIN_F1 = 0x14,    /* f1 14 00 */
+	ADDR_THIRD_MIN_F2 = 0x01,     /* f2 00 01 00 00 */
+	ADDR_THIRD_MIN_F3 = 0x01,     /* F3 0001 0000 0000 */
+};
+
 enum nip_8bit_addr_index {
 	NIP_8BIT_ADDR_INDEX_0 = 0,
 	NIP_8BIT_ADDR_INDEX_1 = 1,

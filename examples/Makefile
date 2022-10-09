@@ -8,7 +8,7 @@ CC=gcc
 # CC = arm-linux-gnueabi-gcc
 CFLAGS=-pthread -static -g
 
-UT_LIST = nip_addr_cfg_demo nip_route_cfg_demo nip_tcp_server_demo nip_tcp_client_demo nip_udp_server_demo nip_udp_client_demo get_af_ninet check_nip_enable
+UT_LIST = nip_addr_cfg_demo nip_route_cfg_demo nip_tcp_server_demo nip_tcp_client_demo nip_udp_server_demo nip_udp_client_demo get_af_ninet check_nip_enable nip_addr nip_route
 
 all: $(UT_LIST)
 
@@ -52,3 +52,9 @@ get_af_ninet: get_af_ninet.c
 
 check_nip_enable: check_nip_enable.c
 	$(CC) $(CFLAGS) -o check_nip_enable check_nip_enable.c
+
+nip_addr: nip_addr.c $(NIP_LIB)
+	$(CC) $(CFLAGS) -o nip_addr nip_addr.c $(NIP_DEF_LIB)
+
+nip_route: nip_route.c $(NIP_LIB)
+	$(CC) $(CFLAGS) -o nip_route nip_route.c $(NIP_DEF_LIB)
