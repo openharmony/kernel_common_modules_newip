@@ -67,31 +67,33 @@ int32_t nip_get_ifindex(const char *ifname, int *ifindex)
 	return 0;
 }
 
-int nip_addr_fmt(char *addr, struct nip_addr *sap, int addrlen_input)
+int nip_addr_fmt(char *addr_str, struct nip_addr *sap, int addrlen_input)
 {
 	unsigned char first_byte;
 	int addrlen, i;
 
 	memset(sap, 0, sizeof(struct nip_addr));
 	for (i = 0; i < INDEX_MAX; i++) {
-		/* 0 ~ 9 = 48 ~ 57,  '0'构造成 0  = 48 - 48 */
-		if (addr[i] >= '0' && addr[i] <= '9')
-			addr[i] = addr[i] - '0';
-		/* A ~ F = 65 ~ 70,  'A'构造成 10 = 65 - 55 */
-		else if (addr[i] >= 'A' && addr[i] <= 'F')
-			addr[i] = addr[i] - STR_FMT_1;
-		/* a ~ f = 97 ~ 102, 'a'构造成 10 = 97 - 87 */
-		else if (addr[i] >= 'a' && addr[i] <= 'f')
-			addr[i] = addr[i] - STR_FMT_2;
-		else if (addr[i] == 0)
+		if (addr_str[i] == 0)
 			break;
 
-		printf("Newip addr error: uaddr[%u]=%c.\n", i, addr[i]);
-		return 1;
+		/* 0 ~ 9 = 48 ~ 57,  '0'构造成 0  = 48 - 48 */
+		if (addr_str[i] >= '0' && addr_str[i] <= '9') {
+			addr_str[i] = addr_str[i] - '0';
+		/* A ~ F = 65 ~ 70,  'A'构造成 10 = 65 - 55 */
+		} else if (addr_str[i] >= 'A' && addr_str[i] <= 'F') {
+			addr_str[i] = addr_str[i] - STR_FMT_1;
+		/* a ~ f = 97 ~ 102, 'a'构造成 10 = 97 - 87 */
+		} else if (addr_str[i] >= 'a' && addr_str[i] <= 'f') {
+			addr_str[i] = addr_str[i] - STR_FMT_2;
+		} else {
+			printf("Newip addr error: uaddr[%u]=%c.\n", i, addr_str[i]);
+			return 1;
+		}
 	}
 
-	first_byte = addr[0] << NIP_ADDR_LEN_4;
-	first_byte += addr[1];
+	first_byte = addr_str[0] << NIP_ADDR_LEN_4;
+	first_byte += addr_str[1];
 	if (first_byte >= 0x00 && first_byte <= ADDR_FIRST_DC)
 		addrlen = NIP_ADDR_LEN_1;
 	else if ((first_byte > ADDR_FIRST_DC && first_byte <= ADDR_FIRST_F0) ||
@@ -117,8 +119,8 @@ int nip_addr_fmt(char *addr, struct nip_addr *sap, int addrlen_input)
 	printf("*************************************************\n");
 	printf("Newip addr len=%u\n", addrlen);
 	for (i = 0; i < addrlen; i++) {
-		sap->nip_addr_field8[i] = addr[i * INDEX_2] << INDEX_4;
-		sap->nip_addr_field8[i] += addr[i * INDEX_2 + 1];
+		sap->nip_addr_field8[i] = addr_str[i * INDEX_2] << INDEX_4;
+		sap->nip_addr_field8[i] += addr_str[i * INDEX_2 + 1];
 		printf("%02x ", sap->nip_addr_field8[i]);
 	}
 	printf("\n*************************************************\n\n");
@@ -131,7 +133,7 @@ int nip_get_addr(char **args, struct nip_addr *addr)
 	int ret;
 	char *sp = *args;
 	int addrlen_input = 0;
-	__u8 addr[INDEX_MAX] = {0};
+	__u8 addr_str[INDEX_MAX] = {0};
 
 	while (*sp != '\0') {
 		addrlen_input += 1;
@@ -143,7 +145,7 @@ int nip_get_addr(char **args, struct nip_addr *addr)
 		return -1;
 	}
 
-	ret = sscanf(*args, "%s", addr);
-	return nip_addr_fmt(addr, addr, addrlen_input / ADDR_STR_LEN);
+	ret = sscanf(*args, "%s", addr_str);
+	return nip_addr_fmt(addr_str, addr, addrlen_input / ADDR_STR_LEN);
 }
 
