@@ -62,8 +62,10 @@ void _check_nip_enable(void)
 
 int check_nip_enable(void)
 {
-	if (g_nip_enable == NIP_ENABLE_INVALID)
+	if (g_nip_enable == NIP_ENABLE_INVALID) {
 		_check_nip_enable();
+		g_nip_enable = (g_nip_enable == 1 ? 1 : 0);
+	}
 
 	return g_nip_enable;
 }
@@ -72,7 +74,10 @@ int main(int argc, char **argv)
 {
 	int af_ninet = check_nip_enable();
 
-	printf("nip_enable=%d\n\n", g_nip_enable);
+	if (g_nip_enable)
+		printf("Support NewIP.\n\n");
+	else
+		printf("Not support NewIP.\n\n");
 	return 0;
 }
 
