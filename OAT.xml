@@ -79,6 +79,8 @@ Note:If the text contains special characters, please escape them according to th
 				<filteritem type="filepath" name="figures/.*" desc="Describes the architecture of the NewIP"/>
 				<filteritem type="filepath" name="apply_newip.sh" desc="shield"/>
 				<filteritem type="filepath" name="LICENSE" desc="license file"/>
+				<filteritem type="filepath" name="README_zh.md" desc="readme file"/>
+				<filteritem type="filepath" name="README.md" desc="readme file"/>
 			</filefilter>
 		</filefilterlist>
 	</oatconfig>
