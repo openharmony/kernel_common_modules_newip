@@ -2,7 +2,6 @@
 #
 # Copyright (c) 2022 Huawei Device Co., Ltd.
 #
-# you can use it under the terms of the GPL V2 and the BSD2 license.
 # See the LICENSE file in directory / of this repository for complete details.
 #
 

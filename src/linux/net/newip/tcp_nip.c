@@ -512,8 +512,8 @@ void ninet_sk_rx_dst_set(struct sock *sk, const struct sk_buff *skb)
  */
 static int tcp_nip_conn_request(struct sock *sk, struct sk_buff *skb)
 {
-	return tcp_newip_conn_request(&tcp_nip_request_sock_ops,
-				&tcp_request_sock_newip_ops, sk, skb);
+	return _tcp_nip_conn_request(&tcp_nip_request_sock_ops,
+				     &tcp_request_sock_newip_ops, sk, skb);
 }
 
 /* Function
@@ -733,9 +733,9 @@ void tcp_nip_keepalive_enable(struct sock *sk)
 		return;
 	}
 
-	pr_crit("%s ok, HZ=%u, time/probes/intvl [%u, %u, %u]",
-		__func__, HZ, tp->keepalive_time, tp->keepalive_probes,
-		tp->keepalive_intvl);
+	DEBUG("%s ok, HZ=%u, time/probes/intvl [%u, %u, %u]",
+	      __func__, HZ, tp->keepalive_time, tp->keepalive_probes,
+	      tp->keepalive_intvl);
 	tp->nip_keepalive_enable = true;
 #endif
 }

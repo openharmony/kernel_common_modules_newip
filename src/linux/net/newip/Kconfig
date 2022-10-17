@@ -6,15 +6,8 @@
 #
 
 # NewIP as module will cause a CRASH if you try to unload it
-menuconfig NEWIP
-	tristate "The NewIP protocol"
-	default n
-	help
-	Support for NewIP.
 
-	To compile this protocol support as a module, choose M here: the
-	module will be called NewIP.
-
+# linux-5.10/net/Kconfig define NEWIP
 if NEWIP
 config NEWIP_FAST_KEEPALIVE
 	tristate "NewIP fast keepalive"

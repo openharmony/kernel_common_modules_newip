@@ -161,9 +161,9 @@ static inline bool tcp_nip_write_queue_empty(struct sock *sk)
 
 /* connect */
 int __tcp_nip_connect(struct sock *sk);
-int tcp_newip_conn_request(struct request_sock_ops *rsk_ops,
-		     const struct tcp_request_sock_ops *af_ops,
-		     struct sock *sk, struct sk_buff *skb);
+int _tcp_nip_conn_request(struct request_sock_ops *rsk_ops,
+			  const struct tcp_request_sock_ops *af_ops,
+			  struct sock *sk, struct sk_buff *skb);
 struct sk_buff *tcp_nip_make_synack(
 	const struct sock *sk,
 	struct dst_entry *dst,

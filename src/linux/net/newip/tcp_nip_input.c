@@ -766,9 +766,9 @@ void tcp_nip_openreq_init_rwin(struct request_sock *req,
  *	sk: transmission control block.
  *	skb: Transfer control block buffer.
  */
-int tcp_newip_conn_request(struct request_sock_ops *rsk_ops,
-			   const struct tcp_request_sock_ops *af_ops,
-		     struct sock *sk, struct sk_buff *skb)
+int _tcp_nip_conn_request(struct request_sock_ops *rsk_ops,
+			  const struct tcp_request_sock_ops *af_ops,
+			  struct sock *sk, struct sk_buff *skb)
 {
 	struct tcp_fastopen_cookie foc = { .len = -1 };
 
