@@ -8,6 +8,8 @@
  * Based on net/ipv6/icmp.c
  * Based on net/ipv4/af_inet.c
  */
+#define pr_fmt(fmt) "NIP-ICMP: " fmt
+
 #include <linux/module.h>
 #include <linux/errno.h>
 #include <linux/types.h>

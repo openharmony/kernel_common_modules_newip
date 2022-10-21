@@ -7,6 +7,8 @@
  *
  * Based on net/ipv6/addrconf.c
  */
+#define pr_fmt(fmt) "NIP: " fmt
+
 #include <linux/errno.h>
 #include <linux/types.h>
 #include <linux/kernel.h>

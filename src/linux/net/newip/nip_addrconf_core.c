@@ -7,6 +7,8 @@
  *
  * Based on net/ipv6/addrconf_core.c
  */
+#define pr_fmt(fmt) "NIP: " fmt
+
 #include <net/nip.h>
 #include <net/nip_addrconf.h>
 #include <net/ip.h>

@@ -15,6 +15,8 @@
  * Based on include/net/ipv6.h
  * Based on net/core/secure_seq.c
  */
+#define pr_fmt(fmt) "NIP: " fmt
+
 #include <linux/module.h>
 #include <linux/random.h>
 

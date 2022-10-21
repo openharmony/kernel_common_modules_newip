@@ -10,6 +10,8 @@
  *
  * Based on net/ipv6/protocol.c
  */
+#define pr_fmt(fmt) "NIP: " fmt
+
 #include <net/protocol.h>
 #include <linux/module.h>
 #include <linux/netdevice.h>

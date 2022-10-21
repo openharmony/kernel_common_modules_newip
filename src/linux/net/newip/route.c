@@ -12,6 +12,8 @@
  * Based on net/ipv4/route.c
  * Based on net/ipv6/route.c
  */
+#define pr_fmt(fmt) "NIP: " fmt
+
 #include <linux/module.h>
 #include <linux/netdevice.h>
 #include <linux/socket.h>

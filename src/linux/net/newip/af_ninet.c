@@ -7,7 +7,7 @@
  *
  * Based on  linux/net/ipv6/af_inet6.c
  */
-#define pr_fmt(fmt) "NIP AF-NIET: " fmt
+#define pr_fmt(fmt) "NIP: " fmt
 
 #include <linux/module.h>
 #include <linux/capability.h>

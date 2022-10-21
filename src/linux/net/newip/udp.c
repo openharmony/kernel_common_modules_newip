@@ -12,6 +12,8 @@
  * Based on net/ipv4/udp.c
  * Based on net/ipv6/udp.c
  */
+#define pr_fmt(fmt) "NIP-UDP: " fmt
+
 #include <linux/uaccess.h>
 #include <linux/errno.h>
 #include <linux/if_arp.h>

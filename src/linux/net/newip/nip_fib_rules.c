@@ -7,6 +7,8 @@
  * Based on net/ipv6/fib_rules.c
  * Based on net/ipv6/fib6_rules.c
  */
+#define pr_fmt(fmt) "NIP: " fmt
+
 #include <net/nip_fib.h>
 #include <linux/netdevice.h>
 #include <linux/notifier.h>

@@ -7,6 +7,8 @@
  *
  * Based on net/ipv6/ip6_output.c
  */
+#define pr_fmt(fmt) "NIP-OUTPUT: " fmt
+
 #include <linux/errno.h>
 #include <linux/kernel.h>
 #include <linux/string.h>

@@ -7,6 +7,8 @@
  *
  * Based on net/ipv6/ip6_fib.c
  */
+#define pr_fmt(fmt) "NIP: " fmt
+
 #include <linux/errno.h>
 #include <linux/types.h>
 #include <linux/net.h>

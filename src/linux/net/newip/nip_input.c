@@ -7,6 +7,8 @@
  *
  * Based on net/ipv6/ip6_input.c
  */
+#define pr_fmt(fmt) "NIP-INPUT: " fmt
+
 #include <linux/errno.h>
 #include <linux/types.h>
 #include <linux/socket.h>
@@ -50,7 +52,7 @@ static int nip_rcv_finish(struct sk_buff *skb)
 	if (net->ipv4.sysctl_ip_early_demux && !skb_dst(skb) && !skb->sk) {
 		const struct ninet_protocol *ipprot;
 
-		DEBUG("%s: try to early demux skb.", __func__);
+		DEBUG("%s: try to early demux skb, nexthdr=0x%x.", __func__, NIPCB(skb)->nexthdr);
 		ipprot = rcu_dereference(ninet_protos[NIPCB(skb)->nexthdr]);
 		if (ipprot)
 			edemux = READ_ONCE(ipprot->early_demux);

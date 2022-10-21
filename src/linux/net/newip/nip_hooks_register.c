@@ -5,6 +5,8 @@
  * Definitions for the NewIP Hooks Register module.
  */
 #ifdef CONFIG_NEWIP_HOOKS
+#define pr_fmt(fmt) "NIP: " fmt
+
 #include <net/ninet_hashtables.h>      /* ninet_ehashfn */
 #include <trace/hooks/nip_hooks.h>
 

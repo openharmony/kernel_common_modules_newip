@@ -10,6 +10,8 @@
  *
  * Based on net/ipv4/ip_sockglue.c
  */
+#define pr_fmt(fmt) "NIP: " fmt
+
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/skbuff.h>

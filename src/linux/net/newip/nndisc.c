@@ -7,6 +7,8 @@
  *
  * Based on net/ipv6/ndisc.c
  */
+#define pr_fmt(fmt) "NIP-ND: " fmt
+
 #include <linux/module.h>
 #include <linux/errno.h>
 #include <linux/types.h>

@@ -11,6 +11,8 @@
  *
  * Based on net/ipv4/inet_connection_sock.c
  */
+#define pr_fmt(fmt) "NIP: " fmt
+
 #include <linux/module.h>
 #include <linux/nip.h>
 #include <linux/jhash.h>
