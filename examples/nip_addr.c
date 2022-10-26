@@ -96,7 +96,7 @@ int main(int argc, char **argv_input)
 	argv++;
 	memset(dev, 0, ARRAY_LEN);
 	ret = sscanf(*argv, "%s", dev);
-	if (strncmp(dev, "wlan", NAME_WLAN_LEN) && strncmp(dev, "eth", NAME_ETH_LEN)) {
+	if (strncmp(dev, "wlan", NAME_WLAN_LEN)) {
 		printf("unsupport addr cfg cmd-1, cmd=%s.\n", dev);
 		cmd_help();
 		return -1;

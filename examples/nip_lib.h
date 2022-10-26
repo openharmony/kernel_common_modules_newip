@@ -39,8 +39,8 @@
 #define DEMO_INPUT_3  4
 #define DEMO_INPUT_4  5
 
-/* Eth0 and wlan0 are optional. Change the value based on the actual interface */
-#define NIC_NAME "eth0"
+/* Change the value based on the actual interface */
+#define NIC_NAME "wlan0"
 
 #define BUFLEN          2048
 #define LISTEN_MAX      3
