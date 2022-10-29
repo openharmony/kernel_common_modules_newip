@@ -2,6 +2,6 @@ NewIP - New IP protocol stack
 Copyright (c) 2022 Huawei Device Co., Ltd. All rights reserved.
 
 The src/linux/ subdirectorie is licensed under the GPL V2 License.
-The src/ommon/ subdirectorie is licensed under 3-Clause BSD License.
+The src/common/ subdirectorie is licensed under 3-Clause BSD License.
 The examples/ subdirectorie is licensed under 3-Clause BSD License.
 The tools/ subdirectorie is licensed under the GPL V2 License.
