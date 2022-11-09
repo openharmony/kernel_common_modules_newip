@@ -181,7 +181,6 @@ void tcp_nip_retransmit_timer(struct sock *sk)
 	inet_csk_reset_xmit_timer(sk, ICSK_TIME_RETRANS, icsk->icsk_rto, TCP_RTO_MAX);
 }
 
-#define NIP_MAX_PROBES 2000
 void tcp_nip_probe_timer(struct sock *sk)
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
@@ -198,11 +197,8 @@ void tcp_nip_probe_timer(struct sock *sk)
 		return;
 	}
 
-#ifdef NIP_MAX_PROBES
-	max_probes = NIP_MAX_PROBES; // 2000 - fix session auto close
-#else
-	max_probes = sock_net(sk)->ipv4.sysctl_tcp_retries2;
-#endif
+	/* default: sock_net(sk)->ipv4.sysctl_tcp_retries2 */
+	max_probes = g_nip_probe_max; /* fix session auto close */
 
 	if (sock_flag(sk, SOCK_DEAD)) {
 		const bool alive = inet_csk_rto_backoff(icsk, TCP_RTO_MAX) < TCP_RTO_MAX;
@@ -224,6 +220,8 @@ abort:		icsk_backoff = icsk->icsk_backoff;
 		      __func__, icsk_probes_out, icsk_backoff, max_probes);
 		tcp_nip_write_err(sk);
 	} else {
+		icsk_backoff = icsk->icsk_backoff;
+		icsk_probes_out = icsk->icsk_probes_out;
 		DEBUG("%s will send probe0, icsk_probes_out=%u, icsk_backoff=%u, max_probes=%u",
 		      __func__, icsk_probes_out, icsk_backoff, max_probes);
 		/* Only send another probe if we didn't close things up. */

@@ -312,8 +312,7 @@ static int nip_dst_lookup_tail(struct net *net, const struct sock *sk,
 
 	rt = (struct nip_rt_info *)*dst;
 	if (*dst == &net->newip.nip_broadcast_entry->dst) {
-		if (!&fln->saddr)
-			fln->saddr = fln->daddr;
+		fln->saddr = fln->daddr;
 		err = 0;
 	} else {
 		err = nip_route_get_saddr(net, rt, &fln->daddr, &fln->saddr);

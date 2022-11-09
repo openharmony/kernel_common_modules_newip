@@ -1108,7 +1108,7 @@ int tcp_nip_recvmsg(struct sock *sk, struct msghdr *msg, size_t len, int nonbloc
 	int copied = 0;
 	u32 *seq;
 	unsigned long used;
-	int err;
+	int err = 0;
 	int target;
 	long timeo;
 	size_t len_tmp = len;
@@ -1381,25 +1381,35 @@ static int tcp_nip_rcv(struct sk_buff *skb)
 	int ret;
 	int dif = skb->skb_iif;
 
-	if (skb->pkt_type != PACKET_HOST)
+	if (skb->pkt_type != PACKET_HOST) {
+		DEBUG("%s unknown pkt-type(%u), drop skb.", __func__, skb->pkt_type);
 		goto discard_it;
+	}
 
-	if (!nip_get_tcp_input_checksum(skb))
+	if (!nip_get_tcp_input_checksum(skb)) {
+		DEBUG("%s checksum fail, drop skb.", __func__);
 		goto discard_it;
+	}
 
 	th = (const struct tcphdr *)skb->data;
 
-	if (unlikely(th->doff < sizeof(struct tcphdr) / TCP_NUM_4))
-		goto bad_packet;
+	if (unlikely(th->doff < sizeof(struct tcphdr) / TCP_NUM_4)) {
+		DEBUG("%s non-four byte alignment, drop skb.", __func__);
+		goto discard_it;
+	}
 
 	sk = __ninet_lookup_skb(&tcp_hashinfo, skb, __tcp_hdrlen(th),
-				th->source, th->dest, dif,
-				&refcounted);
-	if (!sk)
+				th->source, th->dest, dif, &refcounted);
+	if (!sk) {
+		DEBUG("%s: can`t find related sock for skb, will disconnect.", __func__);
 		goto no_tcp_socket;
+	}
 
-	if (sk->sk_state == TCP_TIME_WAIT)
-		goto do_time_wait;
+	if (sk->sk_state == TCP_TIME_WAIT) {
+		/* Handles the SK portion of the interrupt state */
+		DEBUG("%s sk_state is TCP_TIME_WAIT, drop skb.", __func__);
+		goto discard_it;
+	}
 	if (sk->sk_state == TCP_NEW_SYN_RECV) {
 		struct request_sock *req = inet_reqsk(sk);
 		struct sock *nsk;
@@ -1420,11 +1430,12 @@ static int tcp_nip_rcv(struct sk_buff *skb)
 			nsk = tcp_nip_check_req(sk, skb, req);
 		}
 		if (!nsk || nsk == sk) {
-			DEBUG("%s skb info error and create newsk failure!!!", __func__);
+			DEBUG("%s skb info error and create newsk failure, drop skb.", __func__);
 			reqsk_put(req);
 			goto discard_and_relse;
 		}
 		if (tcp_nip_child_process(sk, nsk, skb)) {
+			DEBUG("%s child process fail, drop skb.", __func__);
 			goto discard_and_relse;
 		} else {
 			sock_put(sk);
@@ -1434,8 +1445,10 @@ static int tcp_nip_rcv(struct sk_buff *skb)
 
 	tcp_nip_fill_cb(skb, th);
 
-	if (tcp_filter(sk, skb))
+	if (tcp_filter(sk, skb)) {
+		DEBUG("%s tcp filter fail, drop skb.", __func__);
 		goto discard_and_relse;
+	}
 	th = (const struct tcphdr *)skb->data;
 	skb->dev = NULL;
 
@@ -1453,8 +1466,10 @@ static int tcp_nip_rcv(struct sk_buff *skb)
 	} else {
 		DEBUG("%s: sock locked by user! put packet into backlog",
 		      __func__);
-		if (tcp_nip_add_backlog(sk, skb))
+		if (tcp_nip_add_backlog(sk, skb)) {
+			DEBUG("%s add backlog fail, drop skb.", __func__);
 			goto discard_and_relse;
+		}
 	}
 
 	bh_unlock_sock(sk);
@@ -1465,14 +1480,9 @@ put_and_return:
 	return ret ? -1 : 0;
 
 no_tcp_socket:
-	/* Checksum checked, send reset back */
 	tcp_nip_send_reset(NULL, skb);
-	DEBUG("%s: cannot find related tcp sock for skb", __func__);
-	goto discard_it;
-bad_packet:
 	goto discard_it;
 discard_it:
-	DEBUG("%s: drop tcp newip skb and release it", __func__);
 	kfree_skb(skb);
 	return 0;
 
@@ -1480,9 +1490,6 @@ discard_and_relse:
 	sk_drops_add(sk, skb);
 	if (refcounted)
 		sock_put(sk);
-	goto discard_it;
-/* Handles the SK portion of the interrupt state */
-do_time_wait:
 	goto discard_it;
 }
 
