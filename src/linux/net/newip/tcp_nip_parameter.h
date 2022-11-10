@@ -77,6 +77,11 @@ extern bool g_nip_tcp_snd_win_enable;
 extern bool g_nip_tcp_rcv_win_enable;
 
 /*********************************************************************************************/
+/*                            probe parameters                                               */
+/*********************************************************************************************/
+extern int g_nip_probe_max;
+
+/*********************************************************************************************/
 /*                            nip debug parameters                                           */
 /*********************************************************************************************/
 /* Debugging for control DEBUG */
@@ -92,7 +97,7 @@ do { \
 
 /* Debugging of packet retransmission after ACK */
 extern int g_ack_retrans_debug;
-	#define RETRANS_DBG(fmt, ...) \
+#define RETRANS_DBG(fmt, ...) \
 do { \
 	if (g_ack_retrans_debug) \
 		pr_crit(fmt, ##__VA_ARGS__); \

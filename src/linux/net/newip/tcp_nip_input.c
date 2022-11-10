@@ -429,7 +429,7 @@ static int tcp_nip_clean_rtx_queue(struct sock *sk, ktime_t *skb_snd_tstamp)
 
 	while ((skb = tcp_write_queue_head(sk)) && skb != tcp_nip_send_head(sk)) {
 		struct tcp_skb_cb *scb = TCP_SKB_CB(skb);
-		u32 acked_pcount;
+		u32 acked_pcount = 0;
 
 		if (after(scb->end_seq, tp->snd_una)) {
 			if (tcp_skb_pcount(skb) == 1 || !after(tp->snd_una, scb->seq))
@@ -827,7 +827,7 @@ int _tcp_nip_conn_request(struct request_sock_ops *rsk_ops,
 	/* The best way to do this is to prink the value of user_mss and see if it is 0 */
 	tmp_opt.user_mss  = tp->rx_opt.user_mss;
 	/* Parsing of TCP options in SKB */
-	tcp_nip_parse_options(skb, &tmp_opt, 0, false);
+	tcp_nip_parse_options(skb, &tmp_opt, 0, NULL);
 
 	/* Tstamp_ok indicates the TIMESTAMP seen on the received SYN packet */
 	tmp_opt.tstamp_ok = tmp_opt.saw_tstamp;

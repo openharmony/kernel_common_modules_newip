@@ -44,7 +44,7 @@ static int _nip_update_recv_skb_len(struct sk_buff *skb,
 static int nip_rcv_finish(struct sk_buff *skb)
 {
 	struct net *net = dev_net(skb->dev);
-	void (*edemux)(struct sk_buff *skb);
+	void (*edemux)(struct sk_buff *skb) = NULL;
 
 	/* set /proc/sys/net/ipv4/ip_early_demux to change sysctl_ip_early_demux,
 	 * which is used by ipv4, ipv6 and newip

@@ -166,19 +166,18 @@ u32 __nip_tcp_select_window(struct sock *sk)
 
 	/* Don't do rounding if we are using window scaling, since the
 	 * scaled window will not line up with the MSS boundary anyway.
+	 * tp->rx_opt.rcv_wscale is always true
 	 */
-	if (tp->rx_opt.rcv_wscale) {
-		window = free_space;
+	window = free_space;
 
-		/* Advertise enough space so that it won't get scaled away.
-		 * Import case: prevent zero window announcement if
-		 * 1<<rcv_wscale > mss.
-		 */
-		window = ALIGN(window, (1 << tp->rx_opt.rcv_wscale));
-		DEBUG("%s wscale(%u) win change [%u to %u], [allowed|free]space=[%u, %u], mss=%u",
-		      __func__, tp->rx_opt.rcv_wscale, free_space, window,
-		      allowed_space, free_space, mss);
-	}
+	/* Advertise enough space so that it won't get scaled away.
+	 * Import case: prevent zero window announcement if
+	 * 1<<rcv_wscale > mss.
+	 */
+	window = ALIGN(window, (1 << tp->rx_opt.rcv_wscale));
+	DEBUG("%s wscale(%u) win change [%u to %u], [allowed|free]space=[%u, %u], mss=%u",
+	      __func__, tp->rx_opt.rcv_wscale, free_space, window,
+	      allowed_space, free_space, mss);
 	return window;
 }
 
