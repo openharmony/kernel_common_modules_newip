@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: GPL-2.0
+# Copyright (c) 2022 Huawei Device Co., Ltd.
+#
+
+# net/newip/hooks/Kconfig
+source "hooks/Kconfig"
+
+# net/newip/Kconfig
+config NEWIP
+	def_bool $(success,$(srctree)/scripts/oh-check-dir.sh $(srctree)/net/newip)
+	depends on INET
+	help
+	  Support for NewIP.
+
+config NEWIP_FAST_KEEPALIVE
+	bool "NewIP fast keepalive"
+	default n
+	depends on NEWIP
+	help
+	  Support for NewIP fast keepalive.

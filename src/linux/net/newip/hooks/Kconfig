@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: GPL-2.0
+# Copyright (c) 2022 Huawei Device Co., Ltd.
+#
+
+config NEWIP_HOOKS
+	def_bool NEWIP
+	depends on VENDOR_HOOKS && NEWIP
+	help
+	  Enable NewIP hooks implemented as tracepoints
+	  Allow NewIP modules to attach to tracepoint "hooks" defined via
+	  DECLARE_TRACE or DECLARE_HOOK
+
