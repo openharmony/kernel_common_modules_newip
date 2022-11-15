@@ -3,11 +3,11 @@
 #
 
 # net/newip/hooks/Kconfig
-source "hooks/Kconfig"
+source "net/newip/hooks/Kconfig"
 
 # net/newip/Kconfig
 config NEWIP
-	def_bool $(success,$(srctree)/scripts/oh-check-dir.sh $(srctree)/net/newip)
+	def_bool $(success,$(srctree)/scripts/ohos-check-dir.sh $(srctree)/net/newip)
 	depends on INET
 	help
 	  Support for NewIP.
