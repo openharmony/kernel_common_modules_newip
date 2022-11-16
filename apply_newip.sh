@@ -9,7 +9,7 @@ OHOS_SOURCE_ROOT=$1
 KERNEL_BUILD_ROOT=$2
 PRODUCT_NAME=$3
 KERNEL_VERSION=$4
-NEWIP_SOURCE_ROOT=$OHOS_SOURCE_ROOT/foundation/communication/sfc/newip
+NEWIP_SOURCE_ROOT=$OHOS_SOURCE_ROOT/kernel/common_modules/newip
 
 function main()
 {
