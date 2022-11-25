@@ -47,11 +47,6 @@ struct tcp_nip_out_options {
 static bool tcp_nip_write_xmit(struct sock *sk, unsigned int mss_now, int nonagle,
 			       int push_one, gfp_t gfp);
 
-static void tcp_nip_event_data_sent(struct tcp_sock *tp,
-				    struct sock *sk)
-{
-}
-
 /* Calculate MSS not accounting any TCP options.  */
 static inline int __tcp_nip_mtu_to_mss(struct sock *sk, int pmtu)
 {
@@ -548,7 +543,6 @@ static int __tcp_nip_transmit_skb(struct sock *sk, struct sk_buff *skb,
 
 	 /* There's data to send */
 	if (skb->len != tcp_header_size) {
-		tcp_nip_event_data_sent(tp, sk);
 		tp->data_segs_out += tcp_skb_pcount(skb);
 	}
 

@@ -1152,7 +1152,7 @@ static int tcp_nip_ack(struct sock *sk, const struct sk_buff *skb, int flag)
 	if (after(ack, tp->snd_nxt))
 		return -1;
 
-	flag |= tcp_nip_ack_update_window(sk, skb, ack, ack_seq);
+	(void)tcp_nip_ack_update_window(sk, skb, ack, ack_seq);
 	icsk->icsk_probes_out = 0; // probe0 cnt
 	ntp->nip_keepalive_out = 0; // keepalive cnt
 	tp->rcv_tstamp = tcp_jiffies32;
