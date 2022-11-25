@@ -95,7 +95,7 @@ int main(int argc, char **argv)
 		perror("bind");
 		goto END;
 	}
-	printf("bind success, addr=0x%02x%02x, port=%u\n",
+	printf("bind success, addr=0x%02x%02x, port=%d\n",
 	       si_local.sin_addr.nip_addr_field8[INDEX_0],
 	       si_local.sin_addr.nip_addr_field8[INDEX_1], TCP_SERVER_PORT);
 

@@ -109,7 +109,7 @@ int main(int argc, char **argv)
 	if (ret != 0)
 		return -1;
 
-	printf("%s %s(ifindex=%u) cfg addr success.\n", *argv, NIC_NAME, ifindex);
+	printf("%s %s(ifindex=%d) cfg addr success.\n", *argv, NIC_NAME, ifindex);
 	return 0;
 }
 

@@ -53,7 +53,7 @@ static int _get_nip_hdr_bitmap(unsigned char *buf,
 }
 
 /* Must carry the current field */
-static int _get_nip_hdr_ttl(unsigned char *buf,
+static int _get_nip_hdr_ttl(const unsigned char *buf,
 			    unsigned char bitmap,
 			    struct nip_hdr_decap *niph)
 {
@@ -70,7 +70,7 @@ static int _get_nip_hdr_ttl(unsigned char *buf,
 /* Communication between devices of the same version may not carry packet Header length,
  * but communication between devices of different versions must carry packet header length
  */
-static int _get_nip_hdr_len(unsigned char *buf,
+static int _get_nip_hdr_len(const unsigned char *buf,
 			    unsigned char bitmap,
 			    struct nip_hdr_decap *niph)
 {
@@ -90,7 +90,7 @@ static int _get_nip_hdr_len(unsigned char *buf,
 }
 
 /* Must carry the current field */
-static int _get_nip_hdr_nexthdr(unsigned char *buf,
+static int _get_nip_hdr_nexthdr(const unsigned char *buf,
 				unsigned char bitmap,
 				struct nip_hdr_decap *niph)
 {
@@ -260,7 +260,6 @@ static int nip_hdr_check(struct nip_hdr_decap *niph)
 int nip_hdr_parse(unsigned char *rcv_buf, unsigned int buf_len, struct nip_hdr_decap *niph)
 {
 	int i = 0;
-	int len;
 	int ret;
 	unsigned char *buf = rcv_buf;
 	unsigned char bitmap[BITMAP_MAX] = {0};
@@ -276,7 +275,8 @@ int nip_hdr_parse(unsigned char *rcv_buf, unsigned int buf_len, struct nip_hdr_d
 	while (i < num) {
 		if (i >= FACTORY_NUM_MAX)
 			break;
-		len = hdr_parse_factory[i](buf, bitmap[i], niph);
+		int len = hdr_parse_factory[i](buf, bitmap[i], niph);
+
 		if (len < 0)
 			return len;
 

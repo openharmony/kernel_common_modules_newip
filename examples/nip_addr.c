@@ -45,7 +45,7 @@
  * ioctl(fd, SIOGIFINDEX, &ifr);
  * ifr.ifr_ifindex; ===> ifindex
  */
-int32_t nip_add_addr(int32_t ifindex, struct nip_addr *addr, int opt)
+int32_t nip_add_addr(int32_t ifindex, const struct nip_addr *addr, int opt)
 {
 	int fd, ret;
 	struct nip_ifreq ifrn;
@@ -60,7 +60,7 @@ int32_t nip_add_addr(int32_t ifindex, struct nip_addr *addr, int opt)
 
 	ret = ioctl(fd, opt, &ifrn);
 	if (ret < 0 && errno != EEXIST) { // ignore File Exists error
-		printf("cfg newip addr fail, ifindex=%d, opt=%u, ret=%d.\n", ifindex, opt, ret);
+		printf("cfg newip addr fail, ifindex=%d, opt=%d, ret=%d.\n", ifindex, opt, ret);
 		close(fd);
 		return -1;
 	}
@@ -80,6 +80,7 @@ int main(int argc, char **argv_input)
 {
 	int ret;
 	int opt;
+	unsigned int len;
 	int ifindex = 0;
 	char **argv = argv_input;
 	char cmd[ARRAY_LEN];
@@ -87,7 +88,7 @@ int main(int argc, char **argv_input)
 	struct nip_addr addr = {0};
 
 	if (argc != DEMO_INPUT_3) {
-		printf("unsupport addr cfg input, argc=%u.\n", argc);
+		printf("unsupport addr cfg input, argc=%d.\n", argc);
 		cmd_help();
 		return -1;
 	}
@@ -95,7 +96,13 @@ int main(int argc, char **argv_input)
 	/* 配置参数1解析: <netcard-name> */
 	argv++;
 	memset(dev, 0, ARRAY_LEN);
-	ret = sscanf(*argv, "%s", dev);
+
+	len = strlen(*argv);
+	if (!len || len >= (ARRAY_LEN - 1))
+		return -1;
+	memcpy(dev, *argv, len);
+	dev[len + 1] = '\0';
+
 	if (strncmp(dev, "wlan", NAME_WLAN_LEN)) {
 		printf("unsupport addr cfg cmd-1, cmd=%s.\n", dev);
 		cmd_help();
@@ -108,7 +115,13 @@ int main(int argc, char **argv_input)
 	/* 配置参数2解析: { add | del } */
 	argv++;
 	memset(cmd, 0, ARRAY_LEN);
-	ret = sscanf(*argv, "%s", cmd);
+
+	len = strlen(*argv);
+	if (!len || len >= (ARRAY_LEN - 1))
+		return -1;
+	memcpy(cmd, *argv, len);
+	cmd[len + 1] = '\0';
+
 	if (!strncmp(cmd, "add", NAME_WLAN_LEN)) {
 		opt = SIOCSIFADDR;
 	} else if (!strncmp(cmd, "del", NAME_WLAN_LEN)) {
@@ -131,7 +144,7 @@ int main(int argc, char **argv_input)
 	if (ret != 0)
 		return -1;
 
-	printf("%s (ifindex=%u) cfg addr success.\n", dev, ifindex);
+	printf("%s (ifindex=%d) cfg addr success.\n", dev, ifindex);
 	return 0;
 }
 

@@ -87,8 +87,6 @@ int main(int argc, char **argv)
 	uint8_t server_addr[INDEX_2] = {0xDE, 0x00}; // 2-byte address of the server: 0xDE00
 	uint8_t *dst_addr;
 	uint8_t dst_addr_len;
-	uint8_t *gateway_addr;
-	uint8_t gateway_addr_len;
 
 	if (argc == DEMO_INPUT_1) {
 		if (!strcmp(*(argv + 1), "server")) {
@@ -121,7 +119,7 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
-	printf("%s %s(ifindex=%u) cfg route success.\n", *argv, NIC_NAME, ifindex);
+	printf("%s %s(ifindex=%d) cfg route success.\n", *argv, NIC_NAME, ifindex);
 	return 0;
 }
 

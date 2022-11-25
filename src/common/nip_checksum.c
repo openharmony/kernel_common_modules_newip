@@ -33,7 +33,7 @@
 
 #define USHORT_PAYLOAD 16
 #define NIP_CHECKSUM_UINT8_PAYLOAD 8
-unsigned int _nip_check_sum(unsigned char *data, unsigned short data_len)
+unsigned int _nip_check_sum(const unsigned char *data, unsigned short data_len)
 {
 	unsigned int i = 0, sum = 0;
 

@@ -47,8 +47,8 @@
  * ioctl(fd, SIOGIFINDEX, &ifr);
  * ifr.ifr_ifindex; ===> ifindex
  */
-int nip_route_add(int ifindex, struct nip_addr *dst_addr, struct nip_addr *gateway_addr,
-		  uint8_t gateway_flag, int opt)
+int nip_route_add(int ifindex, const struct nip_addr *dst_addr,
+		  const struct nip_addr *gateway_addr, uint8_t gateway_flag, int opt)
 {
 	int fd, ret;
 	struct nip_rtmsg rt;
@@ -92,9 +92,8 @@ int main(int argc, char **argv_input)
 {
 	int ret;
 	int opt;
+	unsigned int len;
 	int ifindex = 0;
-	uint8_t dst_addr_len;
-	uint8_t gateway_addr_len;
 	uint8_t gateway_flag = 0;
 	char **argv = argv_input;
 	char cmd[ARRAY_LEN];
@@ -103,7 +102,7 @@ int main(int argc, char **argv_input)
 	struct nip_addr gateway_addr = {0};
 
 	if (argc != DEMO_INPUT_3 && argc != DEMO_INPUT_4) {
-		printf("unsupport route cfg input, argc=%u.\n", argc);
+		printf("unsupport route cfg input, argc=%d.\n", argc);
 		cmd_help();
 		return -1;
 	}
@@ -111,7 +110,13 @@ int main(int argc, char **argv_input)
 	/* 配置参数1解析: { add | del } */
 	argv++;
 	memset(cmd, 0, ARRAY_LEN);
-	ret = sscanf(*argv, "%s", cmd);
+
+	len = strlen(*argv);
+	if (!len || len >= (ARRAY_LEN - 1))
+		return -1;
+	memcpy(cmd, *argv, len);
+	cmd[len + 1] = '\0';
+
 	if (!strncmp(cmd, "add", NAME_WLAN_LEN)) {
 		opt = SIOCADDRT;
 	} else if (!strncmp(cmd, "del", NAME_WLAN_LEN)) {
@@ -133,7 +138,13 @@ int main(int argc, char **argv_input)
 	/* 配置参数3解析: <netcard-name> */
 	argv++;
 	memset(dev, 0, ARRAY_LEN);
-	ret = sscanf(*argv, "%s", dev);
+
+	len = strlen(*argv);
+	if (!len || len >= (ARRAY_LEN - 1))
+		return -1;
+	memcpy(dev, *argv, len);
+	dev[len + 1] = '\0';
+
 	if (strncmp(dev, "wlan", NAME_WLAN_LEN)) {
 		printf("unsupport route cfg cmd-3, cmd=%s.\n", dev);
 		cmd_help();
@@ -166,7 +177,7 @@ int main(int argc, char **argv_input)
 		return -1;
 	}
 
-	printf("%s (ifindex=%u) cfg route success.\n", dev, ifindex);
+	printf("%s (ifindex=%d) cfg route success.\n", dev, ifindex);
 	return 0;
 }
 
