@@ -347,10 +347,12 @@ static struct sock *ninet_lhash2_lookup(struct net *net,
 {
 	struct inet_connection_sock *icsk;
 	struct sock *sk, *result = NULL;
-	int score, hiscore = 0, matches = 0, reuseport = 0;
+	int hiscore = 0, matches = 0, reuseport = 0;
 	u32 phash = 0;
 
 	inet_lhash2_for_each_icsk_rcu(icsk, &ilb2->head) {
+		int score;
+
 		sk = (struct sock *)icsk;
 		score = nip_tcp_compute_score(sk, net, hnum, daddr, dif, sdif);
 		if (score > hiscore) {

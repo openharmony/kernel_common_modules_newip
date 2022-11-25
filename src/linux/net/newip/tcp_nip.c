@@ -1739,7 +1739,6 @@ void tcp_nip_exit(void)
 #define LOG_PRINT_MAX_LEN 256
 void nip_dbg(const char *fmt, ...)
 {
-	u32 pos;
 	char str[LOG_PRINT_MAX_LEN];
 	va_list args;
 	s32 ret;
@@ -1748,7 +1747,6 @@ void nip_dbg(const char *fmt, ...)
 		return;
 
 	memset(str, 0, sizeof(str));
-	pos = strlen(str);
 	(void)memset(&args, 0, sizeof(va_list));
 	va_start(args, fmt);
 	ret = vsnprintf(str, sizeof(str), fmt, args) + 1;

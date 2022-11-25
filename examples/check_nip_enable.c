@@ -74,7 +74,7 @@ int main(int argc, char **argv)
 {
 	int af_ninet = check_nip_enable();
 
-	if (g_nip_enable)
+	if (af_ninet)
 		printf("Support NewIP.\n\n");
 	else
 		printf("Not support NewIP.\n\n");

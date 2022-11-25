@@ -63,7 +63,7 @@
 static void nndisc_solicit(struct neighbour *neigh, struct sk_buff *skb);
 
 static u32 nndisc_hash(const void *pkey,
-		       const struct net_device *dev, __u32 *fhash_rnd);
+		       const struct net_device *dev, __u32 *hash_rnd);
 static bool nndisc_key_eq(const struct neighbour *neigh, const void *pkey);
 static int nndisc_constructor(struct neighbour *neigh);
 
@@ -142,9 +142,9 @@ static u32 nndisc_hash(const void *pkey,
 	return nndisc_hashfn(pkey, dev, hash_rnd);
 }
 
-static bool nndisc_key_eq(const struct neighbour *n, const void *pkey)
+static bool nndisc_key_eq(const struct neighbour *neigh, const void *pkey)
 {
-	return neigh_key_eq800(n, pkey);
+	return neigh_key_eq800(neigh, pkey);
 }
 
 static int nndisc_constructor(struct neighbour *neigh)
@@ -217,7 +217,7 @@ unsigned short nip_get_nndisc_send_checksum(struct sk_buff *skb,
 }
 
 bool nip_get_nndisc_rcv_checksum(struct sk_buff *skb,
-				 u_char *transport_tail)
+				 const u_char *transport_tail)
 {
 	struct nip_pseudo_header nph = {0};
 	unsigned short check_len = (unsigned short)(transport_tail - (skb_transport_header(skb)));

@@ -342,11 +342,11 @@ static __u16 tcp_nip_advertise_mss(struct sock *sk)
 	struct tcp_sock *tp = tcp_sk(sk);
 	const struct dst_entry *dst = __sk_dst_get(sk);
 	int mss = tp->advmss;
-	int nip_hdr_len;
-	int nip_mss;
 	u32 mtu;
 
 	if (dst) {
+		int nip_hdr_len;
+		int nip_mss;
 		unsigned int metric = dst_metric_advmss(dst);
 
 		if (metric < mss) {
@@ -359,7 +359,6 @@ static __u16 tcp_nip_advertise_mss(struct sock *sk)
 					      &sk->sk_nip_daddr);
 		nip_hdr_len = nip_hdr_len == 0 ? NIP_HDR_MAX : nip_hdr_len;
 		nip_mss = mtu - nip_hdr_len - sizeof(struct tcphdr);
-
 		if (nip_mss > mss) {
 			mss = nip_mss;
 			tp->advmss = mss;
@@ -837,7 +836,7 @@ struct sk_buff *tcp_nip_make_synack(const struct sock *sk, struct dst_entry *dst
 int __nip_send_synack(struct request_sock *req, struct sk_buff *skb)
 {
 	struct inet_request_sock *ireq = inet_rsk(req); /* 连接请求块 */
-	int err = -EFAULT;
+	int err;
 	int csummode = CHECKSUM_NONE;
 	struct nip_addr *saddr, *daddr;
 	struct nip_hdr_encap head = {0};

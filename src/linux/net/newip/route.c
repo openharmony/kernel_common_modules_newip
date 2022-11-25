@@ -212,7 +212,7 @@ static struct nip_rt_info *nip_rt_pcpu_alloc(struct nip_rt_info *rt)
 
 static struct nip_rt_info *nip_rt_make_pcpu_route(struct nip_rt_info *rt)
 {
-	struct nip_rt_info *pcpu_rt, *prev, **p;
+	struct nip_rt_info *pcpu_rt, *prev;
 
 	pcpu_rt = nip_rt_pcpu_alloc(rt);
 	if (!pcpu_rt) {
@@ -224,7 +224,8 @@ static struct nip_rt_info *nip_rt_make_pcpu_route(struct nip_rt_info *rt)
 
 	rcu_read_lock_bh();
 	if (rt->rt_pcpu) {
-		p = this_cpu_ptr(rt->rt_pcpu);
+		struct nip_rt_info **p = this_cpu_ptr(rt->rt_pcpu);
+
 		prev = cmpxchg(p, NULL, pcpu_rt);
 		if (prev) {
 			/* If someone did it before us, return prev instead */

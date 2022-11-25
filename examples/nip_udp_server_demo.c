@@ -50,7 +50,7 @@ void *recv_send(void *args)
 	int fd, ret, recv_num;
 	int count = 0;
 	socklen_t slen;
-	struct sockaddr_nin si_local, si_remote;
+	struct sockaddr_nin si_remote;
 
 	memcpy(&fd, args, sizeof(int));
 	while (count < PKTCNT) {
@@ -105,7 +105,7 @@ int main(int argc, char **argv)
 		goto END;
 	}
 
-	printf("bind success, addr=0x%02x%02x, port=%u\n",
+	printf("bind success, addr=0x%02x%02x, port=%d\n",
 	       si_local.sin_addr.nip_addr_field8[INDEX_0],
 	       si_local.sin_addr.nip_addr_field8[INDEX_1], UDP_SERVER_PORT);
 

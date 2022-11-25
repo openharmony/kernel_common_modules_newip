@@ -73,7 +73,6 @@ static int nip_udp_compute_score(struct sock *sk, struct net *net,
 				 const struct nip_addr *daddr, unsigned short hnum,
 				 int dif, int sdif)
 {
-	bool dev_match;
 	int score = 0;
 	struct inet_sock *inet;
 
@@ -112,8 +111,8 @@ static int nip_udp_compute_score(struct sock *sk, struct net *net,
 
 	/* Check the dev index */
 	if (sk->sk_bound_dev_if) {
-		dev_match = dif == sk->sk_bound_dev_if ||
-			    sdif == sk->sk_bound_dev_if;
+		bool dev_match = dif == sk->sk_bound_dev_if || sdif == sk->sk_bound_dev_if;
+
 		if (!dev_match)
 			return -1;
 		score++;
@@ -135,12 +134,11 @@ static struct sock *nip_udp_lib_lookup2(struct net *net,
 {
 	struct sock *sk;
 	struct sock *result = NULL;
-	int score, badness;
+	int badness = -1;
 
-	badness = -1;
 	udp_portaddr_for_each_entry_rcu(sk, &hslot2->head) {
-		score = nip_udp_compute_score(sk, net, saddr, sport, daddr,
-					      hnum, dif, sdif);
+		int score = nip_udp_compute_score(sk, net, saddr, sport, daddr, hnum, dif, sdif);
+
 		if (score > badness) {
 			result = sk;
 			badness = score;
@@ -226,8 +224,8 @@ int nip_udp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 		    int noblock, int flags, int *addr_len)
 {
 	struct sk_buff *skb;
-	unsigned int ulen, copied, datalen;
-	int peeking, off;
+	unsigned int ulen, copied;
+	int peeking, off, datalen;
 	int err;
 
 	off = sk_peek_offset(sk, flags);
@@ -355,6 +353,13 @@ int nip_udp_output(struct sock *sk, struct msghdr *msg, size_t len)
 	int err = 0;
 	struct inet_sock *inet;
 
+	if (!sin) {
+		/* Currently, udp socket Connect function is not implemented.
+		 * The destination address and port must be directly provided by Sendto
+		 */
+		return -EDESTADDRREQ;
+	}
+
 	if (sin->sin_family != AF_NINET) {
 		DEBUG("%s: sin_family false.", __func__);
 		return -EAFNOSUPPORT;
@@ -365,16 +370,9 @@ int nip_udp_output(struct sock *sk, struct msghdr *msg, size_t len)
 	}
 
 	inet = inet_sk(sk);
-	if (sin) {
-		/* Destination address, port (network order) must be specified when sendto */
-		dport = sin->sin_port;
-		fln.daddr = sin->sin_addr;
-	} else {
-		/* Currently, udp socket Connect function is not implemented.
-		 * The destination address and port must be directly provided by Sendto
-		 */
-		return -EDESTADDRREQ;
-	}
+	/* Destination address, port (network order) must be specified when sendto */
+	dport = sin->sin_port;
+	fln.daddr = sin->sin_addr;
 	sport = htons(inet->inet_num);
 
 	/* Check the dev index */

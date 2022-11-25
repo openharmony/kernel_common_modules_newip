@@ -119,8 +119,6 @@ static int ninet_create(struct net *net, struct socket *sock, int protocol,
 	if (err)
 		goto out_rcu_unlock;
 
-	err = -EPERM;
-
 	sock->ops = answer->ops;
 	answer_prot = answer->prot;
 	answer_flags = answer->flags;

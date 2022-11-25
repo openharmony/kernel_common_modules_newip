@@ -57,7 +57,6 @@ void *send_recv(void *args)
 	fd_set readfds;
 	struct timeval tv, stTime;
 	struct thread_args *th_args = (struct thread_args *) args;
-	struct sockaddr_nin si_server = th_args->si_server;
 
 	cfd = th_args->cfd;
 	for (int i = 0; i < PKTCNT; i++) {
@@ -86,6 +85,10 @@ void *send_recv(void *args)
 				(void)gettimeofday(&stTime, NULL);
 				ret = sscanf(buf, "%d %d NIP_TCP # %d",
 					     &sendtime_sec, &sendtime_usec, &no);
+				if (ret <= 0) {
+					perror("sscanf");
+					goto END;
+				}
 				printf("Received --%s sock %d success:%6d/%6d/no=%6d\n",
 				       buf, cfd, success, count + 1, no);
 			} else {
@@ -125,7 +128,7 @@ int main(int argc, char **argv)
 		perror("connect");
 		return -1;
 	}
-	printf("connect success, addr=0x%02x%02x, port=%u\n",
+	printf("connect success, addr=0x%02x%02x, port=%d\n",
 	       si_server.sin_addr.nip_addr_field8[INDEX_0],
 	       si_server.sin_addr.nip_addr_field8[INDEX_1], TCP_SERVER_PORT);
 

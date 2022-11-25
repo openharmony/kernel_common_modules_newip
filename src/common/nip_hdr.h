@@ -225,7 +225,7 @@ void nip_hdr_comm_encap(struct nip_hdr_encap *head);
 void nip_update_total_len(struct nip_hdr_encap *head, unsigned short total_len);
 
 /* Note: a function call requires its own byte order conversion.(niph->total_len) */
-int nip_hdr_parse(unsigned char *buf, unsigned int buf_len, struct nip_hdr_decap *niph);
+int nip_hdr_parse(unsigned char *rcv_buf, unsigned int buf_len, struct nip_hdr_decap *niph);
 
 /* The length of the packet header is obtained according to the packet type,
  * source ADDRESS, and destination address.

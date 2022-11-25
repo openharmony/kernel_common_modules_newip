@@ -57,9 +57,7 @@ int nip_output(struct net *net, struct sock *sk, struct sk_buff *skb)
 	struct nip_addr *nexthop;
 	struct neighbour *neigh;
 	int ret = 0;
-	int res;
 	struct net_device *dev = skb_dst(skb)->dev;
-	bool is_v6gw = false;
 
 	skb->protocol = htons(ETH_P_NEWIP);
 	skb->dev = dev;
@@ -73,7 +71,8 @@ int nip_output(struct net *net, struct sock *sk, struct sk_buff *skb)
 	if (unlikely(!neigh))
 		neigh = __neigh_create(&nnd_tbl, nexthop, dev, false);
 	if (!IS_ERR(neigh)) {
-		res = neigh_output(neigh, skb, is_v6gw);
+		int res = neigh_output(neigh, skb, false);
+
 		rcu_read_unlock_bh();
 		return res;
 	}

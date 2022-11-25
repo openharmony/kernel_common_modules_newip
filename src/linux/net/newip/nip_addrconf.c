@@ -48,7 +48,7 @@ static struct hlist_head ninet_addr_lst[NIN_ADDR_HSIZE];
 static DEFINE_SPINLOCK(addrconf_hash_lock);
 
 static bool nip_chk_same_addr(struct net *net, const struct nip_addr *addr,
-			      struct net_device *dev);
+			      const struct net_device *dev);
 static int nip_get_firstaddr(const struct net_device *dev,
 			     struct nip_addr *addr);
 static int nip_addrconf_ifdown(struct net_device *dev, bool unregister);
@@ -251,8 +251,6 @@ static int ninet_addr_add(struct net *net, int ifindex,
 	struct ninet_dev *idev;
 	struct net_device *dev;
 	unsigned long timeout;
-	clock_t expires;
-	u32 flags;
 	__u32 ifa_flags_tmp = ifa_flags;
 	__u32 valid_lft_tmp = valid_lft;
 
@@ -271,14 +269,10 @@ static int ninet_addr_add(struct net *net, int ifindex,
 		return PTR_ERR(idev);
 
 	timeout = addrconf_timeout_fixup(valid_lft_tmp, HZ);
-	if (addrconf_finite_timeout(timeout)) {
-		expires = jiffies_to_clock_t(timeout * HZ);
+	if (addrconf_finite_timeout(timeout))
 		valid_lft_tmp = timeout;
-	} else {
-		expires = 0;
-		flags = 0;
+	else
 		ifa_flags_tmp |= IFA_F_PERMANENT;
-	}
 
 	timeout = addrconf_timeout_fixup(preferred_lft, HZ);
 	if (addrconf_finite_timeout(timeout)) {
@@ -448,7 +442,7 @@ int nip_addrconf_del_ifaddr(struct net *net, void __user *arg)
 }
 
 static bool nip_chk_same_addr(struct net *net, const struct nip_addr *addr,
-			      struct net_device *dev)
+			      const struct net_device *dev)
 {
 	unsigned int hash = ninet_addr_hash(addr);
 	struct ninet_ifaddr *ifp;
@@ -863,7 +857,6 @@ out:
 void nip_addr_to_str(const struct nip_addr *addr, unsigned char *buf, int buf_len)
 {
 	int i;
-	int len = 0;
 	int total_len = 0;
 	int addr_num = addr->bitlen / NIP_ADDR_BIT_LEN_8;
 
@@ -872,7 +865,8 @@ void nip_addr_to_str(const struct nip_addr *addr, unsigned char *buf, int buf_le
 
 	total_len = sprintf(buf, "%s", "0x");
 	for (i = 0; (i < addr_num) && (total_len < buf_len); i++) {
-		len = sprintf(buf + total_len, "%02x", addr->nip_addr_field8[i]);
+		int len = sprintf(buf + total_len, "%02x", addr->nip_addr_field8[i]);
+
 		if (len <= 0)
 			break;
 		total_len += len;
