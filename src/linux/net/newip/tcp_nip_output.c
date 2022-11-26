@@ -39,8 +39,6 @@ struct tcp_nip_out_options {
 	u8 ws;			/* window scale, 0 to disable, If the window is enlarged,
 				 * 0 indicates that the option is disabled
 				 */
-	u8 hash_size;		/* bytes in hash_location */
-	__u8 *hash_location;	/* temporary pointer, overloaded */
 	__u32 tsval, tsecr;	/* need to include OPTION_TS */
 };
 
@@ -542,9 +540,8 @@ static int __tcp_nip_transmit_skb(struct sock *sk, struct sk_buff *skb,
 		tcp_nip_event_ack_sent(sk, tcp_skb_pcount(skb), rcv_nxt);
 
 	 /* There's data to send */
-	if (skb->len != tcp_header_size) {
+	if (skb->len != tcp_header_size)
 		tp->data_segs_out += tcp_skb_pcount(skb);
-	}
 
 	memset(skb->cb, 0, sizeof(struct ninet_skb_parm));
 	err = icsk->icsk_af_ops->queue_xmit(sk, skb, &inet->cork.fl);
@@ -607,7 +604,6 @@ int __tcp_nip_connect(struct sock *sk)
 
 	tp->snd_nxt = tp->write_seq;
 	tp->pushed_seq = tp->write_seq;
-	buff = tcp_nip_send_head(sk);
 
 	TCP_INC_STATS(sock_net(sk), TCP_MIB_ACTIVEOPENS);
 
@@ -1040,7 +1036,6 @@ static bool tcp_nip_write_xmit(struct sock *sk, unsigned int mss_now, int nonagl
 	struct sk_buff *skb;
 	u32 snd_num = g_nip_tcp_snd_win_enable ? (ntp->nip_ssthresh / mss_now) : 0xFFFFFFFF;
 	u32 last_nip_ssthresh = ntp->nip_ssthresh;
-	bool snd_wnd_ready;
 	static const char * const str[] = {"can`t send pkt because no window",
 					   "have window to send pkt"};
 
@@ -1062,6 +1057,8 @@ static bool tcp_nip_write_xmit(struct sock *sk, unsigned int mss_now, int nonagl
 	}
 
 	while ((skb = tcp_nip_send_head(sk)) && (snd_num--)) {
+		bool snd_wnd_ready;
+
 		tcp_nip_init_tso_segs(skb, mss_now);
 		snd_wnd_ready = tcp_nip_snd_wnd_test(tp, skb, mss_now);
 		DEBUG("%s %s, skb->len=%u", __func__, (snd_wnd_ready ? str[1] : str[0]), skb->len);
@@ -1105,7 +1102,7 @@ int __tcp_nip_retransmit_skb(struct sock *sk, struct sk_buff *skb, int segs)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
 	unsigned int cur_mss;
-	int diff, len, err;
+	int len, err;
 
 	if (before(TCP_SKB_CB(skb)->seq, tp->snd_una)) {
 		if (unlikely(before(TCP_SKB_CB(skb)->end_seq, tp->snd_una))) {
@@ -1128,7 +1125,8 @@ int __tcp_nip_retransmit_skb(struct sock *sk, struct sk_buff *skb, int segs)
 				 skb, len, cur_mss, GFP_ATOMIC))
 			return -ENOMEM; /* We'll try again later. */
 	} else {
-		diff = tcp_skb_pcount(skb);
+		int diff = tcp_skb_pcount(skb);
+
 		tcp_nip_set_skb_tso_segs(skb, cur_mss);
 		diff -= tcp_skb_pcount(skb);
 		if (diff)

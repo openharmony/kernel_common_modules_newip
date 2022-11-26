@@ -96,8 +96,7 @@ int nip_addr_fmt(char *addr_str, struct nip_addr *sap, int addrlen_input)
 	first_byte += addr_str[1];
 	if (first_byte <= ADDR_FIRST_DC)
 		addrlen = NIP_ADDR_LEN_1;
-	else if ((first_byte > ADDR_FIRST_DC && first_byte <= ADDR_FIRST_F0) ||
-		 (first_byte == ADDR_FIRST_FF))
+	else if (first_byte <= ADDR_FIRST_F0 || first_byte == ADDR_FIRST_FF)
 		addrlen = NIP_ADDR_LEN_2;
 	else if (first_byte == ADDR_FIRST_F1)
 		addrlen = NIP_ADDR_LEN_3;
@@ -130,7 +129,6 @@ int nip_addr_fmt(char *addr_str, struct nip_addr *sap, int addrlen_input)
 
 int nip_get_addr(char **args, struct nip_addr *addr)
 {
-	int ret;
 	unsigned int len;
 	char *sp = *args;
 	int addrlen_input = 0;
