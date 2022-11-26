@@ -69,9 +69,7 @@ int get_af_ninet(void)
 
 int main(int argc, char **argv)
 {
-	int af_ninet = get_af_ninet();
-
-	printf("af_ninet=%d\n\n", g_af_ninet);
+	printf("af_ninet=%d\n\n", get_af_ninet());
 	return 0;
 }
 

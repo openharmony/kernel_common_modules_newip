@@ -118,10 +118,10 @@ static void tcp_nip_overlap_handle(struct tcp_sock *tp, struct sk_buff *skb)
 static void tcp_nip_ofo_queue(struct sock *sk)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
-	struct sk_buff *skb;
 
 	while (tp->nip_out_of_order_queue) {
-		skb = tp->nip_out_of_order_queue;
+		struct sk_buff *skb = tp->nip_out_of_order_queue;
+
 		if (after(TCP_SKB_CB(tp->nip_out_of_order_queue)->seq, tp->rcv_nxt))
 			return;
 		tp->nip_out_of_order_queue = tp->nip_out_of_order_queue->next;
@@ -892,8 +892,8 @@ static inline bool tcp_nip_may_update_window(const struct tcp_sock *tp,
 		(ack_seq == tp->snd_wl1 && nwin > tp->snd_wnd);
 }
 
-static int tcp_nip_ack_update_window(struct sock *sk, const struct sk_buff *skb, u32 ack,
-				     u32 ack_seq)
+static void tcp_nip_ack_update_window(struct sock *sk, const struct sk_buff *skb, u32 ack,
+				      u32 ack_seq)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
 	int flag = 0;
@@ -912,8 +912,6 @@ static int tcp_nip_ack_update_window(struct sock *sk, const struct sk_buff *skb,
 			tp->pred_flags = 0;
 		}
 	}
-
-	return flag;
 }
 
 /* Check whether the ACK returned by the packet is detected
@@ -1135,7 +1133,7 @@ static void tcp_nip_ack_calc_ssthresh(struct sock *sk, u32 ack, int icsk_rto_las
 	}
 }
 
-static int tcp_nip_ack(struct sock *sk, const struct sk_buff *skb, int flag)
+static int tcp_nip_ack(struct sock *sk, const struct sk_buff *skb)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
 	struct tcp_nip_common *ntp = &tcp_nip_sk(sk)->common;
@@ -1145,16 +1143,15 @@ static int tcp_nip_ack(struct sock *sk, const struct sk_buff *skb, int flag)
 	u32 ack = TCP_SKB_CB(skb)->ack_seq;
 	int prior_packets = tp->packets_out;
 	ktime_t skb_snd_tstamp = 0;
-	int icsk_rto_last;
 
 	if (before(ack, prior_snd_una))
 		return 0;
 	if (after(ack, tp->snd_nxt))
 		return -1;
 
-	(void)tcp_nip_ack_update_window(sk, skb, ack, ack_seq);
-	icsk->icsk_probes_out = 0; // probe0 cnt
-	ntp->nip_keepalive_out = 0; // keepalive cnt
+	tcp_nip_ack_update_window(sk, skb, ack, ack_seq);
+	icsk->icsk_probes_out = 0;  /* probe0 cnt */
+	ntp->nip_keepalive_out = 0; /* keepalive cnt */
 	tp->rcv_tstamp = tcp_jiffies32;
 
 	/* maybe zero window probe */
@@ -1167,6 +1164,8 @@ static int tcp_nip_ack(struct sock *sk, const struct sk_buff *skb, int flag)
 	}
 
 	if (after(ack, prior_snd_una)) {
+		int icsk_rto_last;
+
 		icsk->icsk_retransmits = 0;
 		tp->retrans_stamp = tcp_time_stamp(tp);
 		tp->rcv_tstamp = tcp_jiffies32;
@@ -1297,7 +1296,7 @@ void tcp_nip_rcv_established(struct sock *sk, struct sk_buff *skb,
 	if (!tcp_nip_validate_incoming(sk, skb, th, 1))
 		return;
 
-	if (tcp_nip_ack(sk, skb, 0) < 0)
+	if (tcp_nip_ack(sk, skb) < 0)
 		goto discard;
 
 	tcp_nip_data_queue(sk, skb);
@@ -1427,7 +1426,7 @@ static int tcp_nip_rcv_synsent_state_process(struct sock *sk, struct sk_buff *sk
 
 		tcp_init_wl(tp, TCP_SKB_CB(skb)->seq);
 
-		tcp_nip_ack(sk, skb, FLAG_SLOWPATH);
+		tcp_nip_ack(sk, skb);
 		tp->nip_out_of_order_queue = NULL;
 		/* The next data number expected to be accepted is +1 */
 		tp->rcv_nxt = TCP_SKB_CB(skb)->seq + 1;
@@ -1556,7 +1555,7 @@ int tcp_nip_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 	if (!tcp_nip_validate_incoming(sk, skb, th, 0))
 		return 0;
 
-	acceptable = tcp_nip_ack(sk, skb, 0);
+	acceptable = tcp_nip_ack(sk, skb);
 
 	/* If the third handshake ACK is invalid, 1 is returned
 	 * and the SKB is discarded in tcp_nip_rcv
