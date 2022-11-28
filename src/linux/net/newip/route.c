@@ -657,6 +657,8 @@ static struct neighbour *nip_neigh_lookup(const struct dst_entry *dst,
 
 static struct dst_entry *nip_dst_check(struct dst_entry *dst, u32 cookie)
 {
+	if (dst->obsolete != DST_OBSOLETE_FORCE_CHK)
+		return NULL;
 	return dst;
 }
 
@@ -689,9 +691,28 @@ static unsigned int nip_mtu(const struct dst_entry *dst)
 	return mtu;
 }
 
+static void nip_dst_ifdown(struct dst_entry *dst, struct net_device *dev,
+			   int how)
+{
+	struct nip_rt_info *rt = (struct nip_rt_info *)dst;
+	struct ninet_dev *idev = rt->rt_idev;
+	struct net_device *loopback_dev =
+		dev_net(dev)->loopback_dev;
+
+	if (idev && idev->dev != loopback_dev) {
+		struct ninet_dev *loopback_idev = nin_dev_get(loopback_dev);
+
+		if (loopback_idev) {
+			rt->rt_idev = loopback_idev;
+			nin_dev_put(idev);
+		}
+	}
+}
+
 static struct dst_ops nip_dst_ops_template = {
 	.family			= AF_NINET,
 	.destroy		= nip_dst_destroy,
+	.ifdown			= nip_dst_ifdown,
 	.neigh_lookup		= nip_neigh_lookup,
 	.check			= nip_dst_check,
 	.default_advmss		= nip_default_advmss,
