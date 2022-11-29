@@ -1528,8 +1528,7 @@ static void tcp_nip_early_demux(struct sk_buff *skb)
 
 			if (dst)
 				dst = dst_check(dst, 0);
-			if (dst &&
-			    inet_sk(sk)->rx_dst_ifindex == skb->skb_iif) {
+			if (dst && inet_sk(sk)->rx_dst_ifindex == skb->skb_iif) {
 				DEBUG("%s: find sock in ehash, set dst for skb", __func__);
 				skb_dst_set_noref(skb, dst);
 			}
