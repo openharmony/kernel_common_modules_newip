@@ -103,8 +103,11 @@ int nip_send_skb(struct sk_buff *skb)
 
 	net = skb->sk ? sock_net(skb->sk) : dev_net(skb_dst(skb)->dev);
 	err = nip_local_out(net, skb->sk, skb);
-	if (err)
-		DEBUG("%s: failed to out skb!", __func__);
+	if (err) {
+		if (err > 0)
+			err = net_xmit_errno(err);
+		DEBUG("%s: failed to out skb! err = %d", __func__, err);
+	}
 
 	return err;
 }
