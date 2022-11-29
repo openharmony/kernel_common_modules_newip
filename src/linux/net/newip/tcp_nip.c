@@ -1300,6 +1300,15 @@ static int tcp_nip_do_rcv(struct sock *sk, struct sk_buff *skb)
 	DEBUG("%s: received newip tcp skb, sk_state=%d", __func__, sk->sk_state);
 
 	if (sk->sk_state == TCP_ESTABLISHED) {
+		struct dst_entry *dst = sk->sk_rx_dst;
+
+		if (dst) {
+			if (inet_sk(sk)->rx_dst_ifindex != skb->skb_iif ||
+			    !dst->ops->check(dst, 0)) {
+				dst_release(dst);
+				sk->sk_rx_dst = NULL;
+			}
+		}
 		tcp_nip_rcv_established(sk, skb, tcp_hdr(skb), skb->len);
 		return 0;
 	}
@@ -1517,6 +1526,8 @@ static void tcp_nip_early_demux(struct sk_buff *skb)
 		if (sk_fullsock(sk)) {
 			struct dst_entry *dst = READ_ONCE(sk->sk_rx_dst);
 
+			if (dst)
+				dst = dst_check(dst, 0);
 			if (dst &&
 			    inet_sk(sk)->rx_dst_ifindex == skb->skb_iif) {
 				DEBUG("%s: find sock in ehash, set dst for skb", __func__);
