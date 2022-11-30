@@ -896,14 +896,12 @@ static void tcp_nip_ack_update_window(struct sock *sk, const struct sk_buff *skb
 				      u32 ack_seq)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
-	int flag = 0;
 	u32 nwin = ntohs(tcp_hdr(skb)->window);
 
 	if (likely(!tcp_hdr(skb)->syn))
 		nwin <<= tp->rx_opt.snd_wscale;
 
 	if (tcp_nip_may_update_window(tp, ack, ack_seq, nwin)) {
-		flag |= FLAG_WIN_UPDATE;
 		tcp_update_wl(tp, ack_seq);
 
 		if (tp->snd_wnd != nwin) {
