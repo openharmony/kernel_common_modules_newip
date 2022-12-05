@@ -115,8 +115,10 @@ int nip_fib_add(struct hlist_head *nip_tb_head, struct nip_rt_info *rt)
 	h = &nip_tb_head[hash];
 
 	hlist_for_each_entry(fib_node, h, fib_hlist) {
-		if (nip_addr_eq(&fib_node->nip_route_info->rt_dst,
-				&rt->rt_dst)) {
+		if (nip_addr_and_ifindex_eq
+			(&fib_node->nip_route_info->rt_dst, &rt->rt_dst,
+			fib_node->nip_route_info->rt_idev->dev->ifindex,
+			rt->rt_idev->dev->ifindex)) {
 			err = -EEXIST;
 			goto fail;
 		}

@@ -59,6 +59,13 @@ int nip_rcv(struct sk_buff *skb, struct net_device *dev,
 struct nip_rt_info *nip_dst_alloc(struct net *net, struct net_device *dev,
 				  int flags);
 
+static inline bool nip_addr_and_ifindex_eq(const struct nip_addr *a1,
+			       const struct nip_addr *a2, int ifindex1, int ifindex2)
+{
+	return (a1->bitlen == a2->bitlen) && (a1->bitlen <= NIP_ADDR_BIT_LEN_MAX) &&
+	       (memcmp(&a1->v.u, &a2->v.u, a1->bitlen >> 3) == 0) && (ifindex1 == ifindex2);
+};
+
 static inline bool nip_addr_eq(const struct nip_addr *a1,
 			       const struct nip_addr *a2)
 {
