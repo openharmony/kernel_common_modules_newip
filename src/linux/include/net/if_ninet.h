@@ -61,4 +61,6 @@ struct ninet_dev {
 	struct rcu_head rcu;
 };
 
+int ninet_gifconf(struct net_device *dev, char __user *buf, int len, int size);
+
 #endif

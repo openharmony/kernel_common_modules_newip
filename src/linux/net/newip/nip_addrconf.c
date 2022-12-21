@@ -92,34 +92,36 @@ static struct ninet_ifaddr *nip_add_addr(struct ninet_dev *idev,
 
 	if (idev->dead) {
 		err = -ENODEV;
-		goto out2;
+		goto rcu_lock_out;
 	}
 
 	if (idev->cnf.disable_nip) {
 		err = -EACCES;
-		goto out2;
+		goto rcu_lock_out;
 	}
 
 	spin_lock(&addrconf_hash_lock);
 
 	/* Do not configure two same addresses in a netdevice */
 	if (nip_chk_same_addr(dev_net(idev->dev), addr, idev->dev)) {
-		DEBUG("%s: already assigned", __func__);
+		nip_dbg("%s: already assigned", __func__);
 		err = -EEXIST;
-		goto out;
+		goto spin_lock_out;
 	}
 
 	ifa = kzalloc(sizeof(*ifa), GFP_ATOMIC);
 	if (!ifa) {
-		DEBUG("%s: malloc failed", __func__);
+		/* If you add log here, there will be an alarm:
+		 * WARNING: Possible unnecessary 'out of memory' message
+		 */
 		err = -ENOBUFS;
-		goto out;
+		goto spin_lock_out;
 	}
 
 	rt = nip_addrconf_dst_alloc(idev, addr);
 	if (IS_ERR(rt)) {
 		err = PTR_ERR(rt);
-		goto out;
+		goto spin_lock_out;
 	}
 
 	neigh_parms_data_state_setall(idev->nd_parms);
@@ -152,12 +154,11 @@ static struct ninet_ifaddr *nip_add_addr(struct ninet_dev *idev,
 	nin_ifa_hold(ifa);
 	write_unlock(&idev->lock);
 
-out2:
+rcu_lock_out:
 	rcu_read_unlock_bh();
 
 	if (likely(err == 0)) {
-		DEBUG("%s: success! idev->refcnt=%u", __func__,
-		      refcount_read(&idev->refcnt));
+		nip_dbg("%s: success, idev->refcnt=%u", __func__, refcount_read(&idev->refcnt));
 	} else {
 		kfree(ifa);
 		nin_dev_put(idev);
@@ -165,9 +166,9 @@ out2:
 	}
 
 	return ifa;
-out:
+spin_lock_out:
 	spin_unlock(&addrconf_hash_lock);
-	goto out2;
+	goto rcu_lock_out;
 }
 
 static struct ninet_dev *nip_add_dev(struct net_device *dev)
@@ -201,7 +202,7 @@ static struct ninet_dev *nip_add_dev(struct net_device *dev)
 
 	refcount_set(&ndev->refcnt, 1);
 
-	DEBUG("%s: init ninet_dev success!, set ndev->refcnt=1", __func__);
+	nip_dbg("%s: init ninet_dev success, set ndev->refcnt=1", __func__);
 
 	if (netif_running(dev) && nip_addrconf_link_ready(dev))
 		ndev->if_flags |= IF_READY;
@@ -287,7 +288,7 @@ static int ninet_addr_add(struct net *net, int ifindex,
 	if (!IS_ERR(ifp)) {
 		nin_ifa_put(ifp);
 		nip_ins_rt(ifp->rt);
-		DEBUG("%s: success! ifp->refcnt=%u", __func__, refcount_read(&ifp->refcnt));
+		nip_dbg("%s: success, ifp->refcnt=%u", __func__, refcount_read(&ifp->refcnt));
 		return 0;
 	}
 
@@ -299,8 +300,8 @@ void ninet_ifa_finish_destroy(struct ninet_ifaddr *ifp)
 {
 	WARN_ON(!hlist_unhashed(&ifp->addr_lst));
 
-	DEBUG("%s: before idev put. idev->refcnt=%u", __func__,
-	      refcount_read(&ifp->idev->refcnt));
+	nip_dbg("%s: before idev put. idev->refcnt=%u", __func__,
+		refcount_read(&ifp->idev->refcnt));
 
 	nin_dev_put(ifp->idev);
 
@@ -368,7 +369,7 @@ static int ninet_addr_del(struct net *net, int ifindex, u32 ifa_flags,
 			read_unlock_bh(&idev->lock);
 
 			nip_del_addr(ifp);
-			DEBUG("nip_addr_del: success!");
+			nip_dbg("nip_addr_del: success");
 			return 0;
 		}
 	}
@@ -383,22 +384,22 @@ int nip_addrconf_add_ifaddr(struct net *net, void __user *arg)
 	int err;
 
 	if (!ns_capable(net->user_ns, CAP_NET_ADMIN)) {
-		DEBUG("%s: not admin can`t cfg.", __func__);
+		nip_dbg("%s: not admin can`t cfg", __func__);
 		return -EPERM;
 	}
 
 	if (copy_from_user(&ireq, arg, sizeof(struct nip_ifreq))) {
-		DEBUG("%s: fail to copy cfg data.", __func__);
+		nip_dbg("%s: fail to copy cfg data", __func__);
 		return -EFAULT;
 	}
 
 	if (nip_addr_invalid(&ireq.ifrn_addr)) {
-		DEBUG("%s: nip addr invalid, bitlen=%u.", __func__, ireq.ifrn_addr.bitlen);
+		nip_dbg("%s: nip addr invalid, bitlen=%u", __func__, ireq.ifrn_addr.bitlen);
 		return -EFAULT;
 	}
 
 	if (nip_addr_public(&ireq.ifrn_addr)) {
-		DEBUG("%s: The public address cannot be configured.", __func__);
+		nip_dbg("%s: The public address cannot be configured", __func__);
 		return -EFAULT;
 	}
 
@@ -416,22 +417,22 @@ int nip_addrconf_del_ifaddr(struct net *net, void __user *arg)
 	int err;
 
 	if (!ns_capable(net->user_ns, CAP_NET_ADMIN)) {
-		DEBUG("%s: not admin can`t cfg.", __func__);
+		nip_dbg("%s: not admin can`t cfg", __func__);
 		return -EPERM;
 	}
 
 	if (copy_from_user(&ireq, arg, sizeof(struct nip_ifreq))) {
-		DEBUG("%s: fail to copy cfg data.", __func__);
+		nip_dbg("%s: fail to copy cfg data", __func__);
 		return -EFAULT;
 	}
 
 	if (nip_addr_invalid(&ireq.ifrn_addr)) {
-		DEBUG("%s: nip addr invalid, bitlen=%u.", __func__, ireq.ifrn_addr.bitlen);
+		nip_dbg("%s: nip addr invalid, bitlen=%u", __func__, ireq.ifrn_addr.bitlen);
 		return -EFAULT;
 	}
 
 	if (nip_addr_public(&ireq.ifrn_addr)) {
-		DEBUG("%s: Public addresses cannot be deleted.", __func__);
+		nip_dbg("%s: Public addresses cannot be deleted", __func__);
 		return -EFAULT;
 	}
 
@@ -507,7 +508,7 @@ static int nip_addrconf_notify(struct notifier_block *this, unsigned long event,
 	switch (event) {
 	case NETDEV_REGISTER:
 		if (!idev && dev->mtu >= NIP_MIN_MTU) {
-			DEBUG("NIP_ADDRCONF(NETDEV_REGISTER): ");
+			nip_dbg("NIP_ADDRCONF(NETDEV_REGISTER): ");
 			idev = nip_add_dev(dev);
 			if (IS_ERR(idev))
 				return notifier_from_errno(PTR_ERR(idev));
@@ -547,8 +548,8 @@ static int nip_addrconf_notify(struct notifier_block *this, unsigned long event,
 		if (event == NETDEV_UP) {
 			if (!nip_addrconf_link_ready(dev)) {
 				/* device is not ready yet. */
-				DEBUG("NIP_ADDRCONF(NETDEV_UP): ");
-				DEBUG("%s:link is not ready", dev->name);
+				nip_dbg("NIP_ADDRCONF(NETDEV_UP)");
+				nip_dbg("%s:link is not ready", dev->name);
 				break;
 			}
 
@@ -558,16 +559,15 @@ static int nip_addrconf_notify(struct notifier_block *this, unsigned long event,
 			if (!IS_ERR_OR_NULL(idev))
 				idev->if_flags |= IF_READY;
 		} else if (event == NETDEV_CHANGE) {
-			if (!nip_addrconf_link_ready(dev)) {
+			if (!nip_addrconf_link_ready(dev))
 				/* device is still not ready. */
 				break;
-			}
 
 			if (idev)
 				idev->if_flags |= IF_READY;
 
-			DEBUG("NIP_ADDRCONF(NETDEV_CHANGE):");
-			DEBUG("%s:link becomes ready", dev->name);
+			nip_dbg("NIP_ADDRCONF(NETDEV_CHANGE)");
+			nip_dbg("%s:link becomes ready", dev->name);
 		}
 
 		if (!IS_ERR_OR_NULL(idev)) {
@@ -575,10 +575,8 @@ static int nip_addrconf_notify(struct notifier_block *this, unsigned long event,
 			 * when the interface up, the changed MTU must be
 			 * reflected in the idev as well as routers.
 			 */
-			if (idev->cnf.mtu != dev->mtu &&
-			    dev->mtu >= NIP_MIN_MTU) {
+			if (idev->cnf.mtu != dev->mtu && dev->mtu >= NIP_MIN_MTU)
 				idev->cnf.mtu = dev->mtu;
-			}
 			idev->tstamp = jiffies;
 
 			/* If the changed mtu during down is lower than
@@ -611,8 +609,8 @@ static int nip_addrconf_ifdown(struct net_device *dev, bool unregister)
 
 	ASSERT_RTNL();
 
-	DEBUG("%s: %s ifindex=%u, unregister=%u (unregister:1, down:0)",
-	      __func__, dev->name, dev->ifindex, unregister);
+	nip_dbg("%s: %s ifindex=%u, unregister=%u (unregister:1, down:0)",
+		__func__, dev->name, dev->ifindex, unregister);
 
 	nip_rt_ifdown(net, dev);
 	neigh_ifdown(&nnd_tbl, dev);
@@ -639,7 +637,7 @@ static int nip_addrconf_ifdown(struct net_device *dev, bool unregister)
 				char addr[NIP_ADDR_BIT_LEN_MAX] = {0};
 
 				nip_addr_to_str(&ifa->addr, addr, NIP_ADDR_BIT_LEN_MAX);
-				DEBUG("%s: clear addr hash table.(addr=%s)", __func__, addr);
+				nip_dbg("%s: clear addr hash table.(addr=%s)", __func__, addr);
 				hlist_del_init_rcu(&ifa->addr_lst);
 			}
 		}
@@ -678,8 +676,8 @@ static int nip_addrconf_ifdown(struct net_device *dev, bool unregister)
 	if (unregister) {
 		neigh_parms_release(&nnd_tbl, idev->nd_parms);
 		neigh_ifdown(&nnd_tbl, dev);
-		DEBUG("%s: %s (ifindex=%u) before idev put. idev->refcnt=%u", __func__,
-		      dev->name, dev->ifindex, refcount_read(&idev->refcnt));
+		nip_dbg("%s: %s (ifindex=%u) before idev put. idev->refcnt=%u", __func__,
+			dev->name, dev->ifindex, refcount_read(&idev->refcnt));
 		nin_dev_put(idev);
 	}
 	return 0;
@@ -692,20 +690,16 @@ static int nip_addr_proc_show(struct seq_file *seq, void *v)
 	int i, j;
 
 	rcu_read_lock();
-	for (i = 0; i < NIN_ADDR_HSIZE; i++) {
+	for (i = 0; i < NIN_ADDR_HSIZE; i++)
 		hlist_for_each_entry_rcu(ifp, &ninet_addr_lst[i], addr_lst) {
 			if (!net_eq(dev_net(ifp->idev->dev), net))
 				continue;
 
-			for (j = 0; j < ifp->addr.bitlen / NIP_ADDR_BIT_LEN_8;
-			     j++) {
-				seq_printf(seq, "%02x",
-					   ifp->addr.nip_addr_field8[j]);
-			}
-			seq_printf(seq, "\t%8s\n",
-				   ifp->idev->dev ? ifp->idev->dev->name : "");
+			for (j = 0; j < ifp->addr.bitlen / NIP_ADDR_BIT_LEN_8; j++)
+				seq_printf(seq, "%02x", ifp->addr.nip_addr_field8[j]);
+			seq_printf(seq, "\t%8s\n", ifp->idev->dev ? ifp->idev->dev->name : "");
 		}
-	}
+
 	rcu_read_unlock();
 	return 0;
 }
@@ -760,7 +754,7 @@ int __init nip_addrconf_init(void)
 
 	err = register_pernet_subsys(&nip_route_proc_net_ops);
 	if (err < 0) {
-		DEBUG("%s: register_pernet_subsys failed!", __func__);
+		nip_dbg("%s: register_pernet_subsys failed", __func__);
 		goto out;
 	}
 
@@ -823,7 +817,7 @@ int nip_addrconf_get_ifaddr(struct net *net, unsigned int cmd, void __user *arg)
 	ifr.nip_ifr_name[IFNAMSIZ - 1] = 0;
 	snin = (struct sockaddr_nin *)&ifr.nip_dev_addr;
 
-	DEBUG("%s, dev name is %s", __func__, ifr.nip_ifr_name);
+	nip_dbg("%s, dev name is %s", __func__, ifr.nip_ifr_name);
 	dev_load(net, ifr.nip_ifr_name);
 
 	if (cmd == SIOCGIFADDR) {

@@ -170,16 +170,16 @@ void tcp_nip_close(struct sock *sk, long timeout)
 	lock_sock(sk);
 	sk->sk_shutdown = SHUTDOWN_MASK;
 
-	DEBUG("%s: sk_state:%d\n", __func__, sk->sk_state);
+	nip_dbg("%s: sk_state:%d", __func__, sk->sk_state);
 
 	if (sk->sk_state == TCP_LISTEN) {
 		tcp_set_state(sk, TCP_CLOSE);
 
 		sk_ack_backlog = READ_ONCE(sk->sk_ack_backlog);
 		inet_csk_listen_stop(sk);
-		DEBUG("%s: sk_state CLOSE, sk_ack_backlog=%u to %u, sk_max_ack_backlog=%u",
-		      __func__, sk_ack_backlog, READ_ONCE(sk->sk_ack_backlog),
-		      READ_ONCE(sk->sk_max_ack_backlog));
+		nip_dbg("%s: sk_state CLOSE, sk_ack_backlog=%u to %u, sk_max_ack_backlog=%u",
+			__func__, sk_ack_backlog, READ_ONCE(sk->sk_ack_backlog),
+			READ_ONCE(sk->sk_max_ack_backlog));
 		goto adjudge_to_death;
 	}
 
@@ -206,7 +206,7 @@ void tcp_nip_close(struct sock *sk, long timeout)
 		 * TCP_SYN_RECV	-> TCP_FIN_WAIT1 (forget it, it's impossible)
 		 * TCP_CLOSE_WAIT -> TCP_LAST_ACK
 		 */
-		DEBUG("%s: ready to send fin, sk_state:%d", __func__, sk->sk_state);
+		nip_dbg("%s: ready to send fin, sk_state=%d", __func__, sk->sk_state);
 		tcp_nip_send_fin(sk);
 	}
 
@@ -326,11 +326,11 @@ static int tcp_nip_connect(struct sock *sk, struct sockaddr *uaddr,
 	orig_dport = usin->sin_port;
 
 	/* Find the route and obtain the source address */
-	DEBUG("%s, sk->sk_bound_dev_if is %d", __func__, sk->sk_bound_dev_if);
+	nip_dbg("%s, sk->sk_bound_dev_if is %d", __func__, sk->sk_bound_dev_if);
 	fln.flowin_oif = sk->sk_bound_dev_if;
 	dst = nip_dst_lookup_flow(sock_net(sk), sk, &fln, NULL);
 	if (IS_ERR(dst)) {
-		DEBUG("%s cannot find dst", __func__);
+		nip_dbg("%s cannot find dst", __func__);
 		err = PTR_ERR(dst);
 		goto failure;
 	}
@@ -341,13 +341,13 @@ static int tcp_nip_connect(struct sock *sk, struct sockaddr *uaddr,
 	fln.saddr = sk->sk_nip_rcv_saddr;
 
 	if (nip_addr_invalid(&fln.daddr)) {
-		DEBUG("%s: nip daddr invalid, bitlen=%u.", __func__, fln.daddr.bitlen);
+		nip_dbg("%s: nip daddr invalid, bitlen=%u", __func__, fln.daddr.bitlen);
 		err = -EFAULT;
 		goto failure;
 	}
 
 	if (nip_addr_invalid(&fln.saddr)) {
-		DEBUG("%s: nip saddr invalid, bitlen=%u.", __func__, fln.saddr.bitlen);
+		nip_dbg("%s: nip saddr invalid, bitlen=%u", __func__, fln.saddr.bitlen);
 		err = -EFAULT;
 		goto failure;
 	}
@@ -413,8 +413,7 @@ static void tcp_nip_send_reset(struct sock *sk, struct sk_buff *skb)
 	if (th->rst)
 		return;
 
-	DEBUG("%s: send RST!", __func__);
-
+	nip_dbg("%s: send RST", __func__);
 	if (th->ack)
 		seq = ntohl(th->ack_seq);
 	else
@@ -446,7 +445,7 @@ static int tcp_nip_send_synack(const struct sock *sk, struct dst_entry *dst,
 
 	skb = tcp_nip_make_synack(sk, dst, req, foc, synack_type);
 	if (skb) {
-		DEBUG("%s: TCP server create SYN+ACK skb successfully!", __func__);
+		nip_dbg("%s: TCP server create SYN+ACK skb successfully", __func__);
 		rcu_read_lock();
 		err = nip_send_synack(req, skb);
 		rcu_read_unlock();
@@ -640,7 +639,7 @@ static int tcp_nip_keepalive_para_update(struct sock *sk,
 	/* set keep idle (TCP_KEEPIDLE) */
 	val = keepalive_time;
 	if (val < 1 || val > MAX_NIP_TCP_KEEPIDLE) {
-		DEBUG("%s keepalive_time(%u) invalid.", __func__, val);
+		nip_dbg("%s keepalive_time(%u) invalid", __func__, val);
 		return -EINVAL;
 	}
 
@@ -659,7 +658,7 @@ static int tcp_nip_keepalive_para_update(struct sock *sk,
 	/* set keep intvl (TCP_KEEPINTVL) */
 	val = keepalive_intvl;
 	if (val < 1 || val > MAX_NIP_TCP_KEEPINTVL) {
-		DEBUG("%s keepalive_intvl(%u) invalid.", __func__, val);
+		nip_dbg("%s keepalive_intvl(%u) invalid", __func__, val);
 		return -EINVAL;
 	}
 	tp->keepalive_intvl = val;
@@ -667,7 +666,7 @@ static int tcp_nip_keepalive_para_update(struct sock *sk,
 	/* set keep cnt (TCP_KEEPCNT) */
 	val = keepalive_probes;
 	if (val < 1 || val > MAX_NIP_TCP_KEEPCNT) {
-		DEBUG("%s keepalive_probes(%u) invalid.", __func__, val);
+		nip_dbg("%s keepalive_probes(%u) invalid", __func__, val);
 		return -EINVAL;
 	}
 	tp->keepalive_probes = val;
@@ -677,7 +676,7 @@ static int tcp_nip_keepalive_para_update(struct sock *sk,
 		sk->sk_prot->keepalive(sk, 1);
 		sock_valbool_flag(sk, SOCK_KEEPOPEN, 1);
 	} else {
-		DEBUG("%s keepalive func is null.", __func__);
+		nip_dbg("%s keepalive func is null", __func__);
 	}
 
 	return 0;
@@ -704,10 +703,10 @@ void tcp_nip_keepalive_enable(struct sock *sk)
 			ntp->keepalive_probes_bak = tp->keepalive_probes;
 			ntp->keepalive_intvl_bak = tp->keepalive_intvl;
 
-			DEBUG("%s HZ=%u, change time/probes/intvl [%u, %u, %u] to [%u, %u, %u]",
-			      __func__, HZ, tp->keepalive_time, tp->keepalive_probes,
-			      tp->keepalive_intvl, g_nip_keepalive_time, NIP_KEEPALIVE_PROBES,
-			      g_nip_keepalive_intvl);
+			nip_dbg("%s HZ=%u, change time/probes/intvl [%u, %u, %u] to [%u, %u, %u]",
+				__func__, HZ, tp->keepalive_time, tp->keepalive_probes,
+				tp->keepalive_intvl, g_nip_keepalive_time, NIP_KEEPALIVE_PROBES,
+				g_nip_keepalive_intvl);
 
 			tp->keepalive_time = g_nip_keepalive_time;
 			tp->keepalive_probes = NIP_KEEPALIVE_PROBES;
@@ -722,8 +721,8 @@ void tcp_nip_keepalive_enable(struct sock *sk)
 		ntp->keepalive_time_bak = tp->keepalive_time;
 		ntp->keepalive_probes_bak = tp->keepalive_probes;
 		ntp->keepalive_intvl_bak = tp->keepalive_intvl;
-		DEBUG("%s HZ=%u, backup normal time/probes/intvl [%u, %u, %u]", __func__,
-		      HZ, tp->keepalive_time, tp->keepalive_probes, tp->keepalive_intvl);
+		nip_dbg("%s HZ=%u, backup normal time/probes/intvl [%u, %u, %u]", __func__,
+			HZ, tp->keepalive_time, tp->keepalive_probes, tp->keepalive_intvl);
 	}
 
 	/* change para to nip para */
@@ -731,14 +730,14 @@ void tcp_nip_keepalive_enable(struct sock *sk)
 					    g_nip_keepalive_intvl,
 					    NIP_KEEPALIVE_PROBES);
 	if (ret != 0) {
-		DEBUG("%s fail, HZ=%u, time/probes/intvl [%u, %u, %u]", __func__,
-		      HZ, tp->keepalive_time, tp->keepalive_probes, tp->keepalive_intvl);
+		nip_dbg("%s fail, HZ=%u, time/probes/intvl [%u, %u, %u]", __func__,
+			HZ, tp->keepalive_time, tp->keepalive_probes, tp->keepalive_intvl);
 		return;
 	}
 
-	DEBUG("%s ok, HZ=%u, time/probes/intvl [%u, %u, %u]",
-	      __func__, HZ, tp->keepalive_time, tp->keepalive_probes,
-	      tp->keepalive_intvl);
+	nip_dbg("%s ok, HZ=%u, time/probes/intvl [%u, %u, %u]",
+		__func__, HZ, tp->keepalive_time, tp->keepalive_probes,
+		tp->keepalive_intvl);
 	ntp->nip_keepalive_enable = true;
 #endif
 }
@@ -754,7 +753,7 @@ void tcp_nip_keepalive_disable(struct sock *sk)
 
 	if (!sock_flag(sk, SOCK_KEEPOPEN)) {
 		ntp->nip_keepalive_enable = false;
-		DEBUG("%s ok, HZ=%u, normal ka has disable.", __func__, HZ);
+		nip_dbg("%s ok, HZ=%u, normal ka has disable", __func__, HZ);
 		return;
 	}
 
@@ -763,10 +762,10 @@ void tcp_nip_keepalive_disable(struct sock *sk)
 
 	/* newip keepalive change to normal keepalive */
 	if (ntp->keepalive_time_bak) {
-		DEBUG("%s HZ=%u, change normal time/probes/intvl [%u, %u, %u] to [%u, %u, %u].",
-		      __func__, HZ, tp->keepalive_time, tp->keepalive_probes,
-		      tp->keepalive_intvl, ntp->keepalive_time_bak, ntp->keepalive_probes_bak,
-		      ntp->keepalive_intvl_bak);
+		nip_dbg("%s HZ=%u, change normal time/probes/intvl [%u, %u, %u] to [%u, %u, %u]",
+			__func__, HZ, tp->keepalive_time, tp->keepalive_probes,
+			tp->keepalive_intvl, ntp->keepalive_time_bak, ntp->keepalive_probes_bak,
+			ntp->keepalive_intvl_bak);
 		tp->keepalive_time = ntp->keepalive_time_bak;
 		tp->keepalive_probes = ntp->keepalive_probes_bak;
 		tp->keepalive_intvl = ntp->keepalive_intvl_bak;
@@ -783,7 +782,7 @@ void tcp_nip_keepalive_disable(struct sock *sk)
 		sk->sk_prot->keepalive(sk, 0);
 	sock_valbool_flag(sk, SOCK_KEEPOPEN, 0);
 
-	DEBUG("%s ok, HZ=%u, idle_ka_probes_out=%u", __func__, HZ, g_nip_idle_ka_probes_out);
+	nip_dbg("%s ok, HZ=%u, idle_ka_probes_out=%u", __func__, HZ, g_nip_idle_ka_probes_out);
 	ntp->nip_keepalive_enable = false;
 #endif
 }
@@ -940,7 +939,7 @@ int tcp_nip_sendmsg(struct sock *sk, struct msghdr *msg, size_t size)
 restart:
 	mss_now = tcp_nip_send_mss(sk, &size_goal, flags);
 
-	DEBUG("%s: mss_now=%d", __func__, mss_now);
+	nip_dbg("%s: mss_now=%d", __func__, mss_now);
 
 	err = -EPIPE;
 	if (sk->sk_err || (sk->sk_shutdown & SEND_SHUTDOWN))
@@ -982,7 +981,7 @@ restart:
 			if (err)
 				goto do_fault;
 		} else {
-			DEBUG("%s: msg too big! tcp cannot devide packet now", __func__);
+			nip_dbg("%s: msg too big, tcp cannot devide packet now", __func__);
 			goto out;
 		}
 
@@ -1070,9 +1069,8 @@ void tcp_nip_cleanup_rbuf(struct sock *sk, int copied)
 		     ((icsk->icsk_ack.pending & ICSK_ACK_PUSHED2) ||
 		      ((icsk->icsk_ack.pending & ICSK_ACK_PUSHED) &&
 		       !inet_csk_in_pingpong_mode(sk))) &&
-		      !atomic_read(&sk->sk_rmem_alloc))) {
+		      !atomic_read(&sk->sk_rmem_alloc)))
 			time_to_ack = true;
-		}
 	}
 
 	/* We send an ACK if we can now advertise a non-zero window
@@ -1209,7 +1207,7 @@ int tcp_nip_recvmsg(struct sock *sk, struct msghdr *msg, size_t len, int nonbloc
 			release_sock(sk);
 			lock_sock(sk);
 		} else {
-			DEBUG("%s: no enough data receive queue, wait", __func__);
+			nip_dbg("%s: no enough data receive queue, wait", __func__);
 			sk_wait_data(sk, &timeo, last);
 		}
 		continue;
@@ -1217,11 +1215,11 @@ found_ok_skb:
 		used = skb->len - offset;
 		if (len_tmp < used)
 			used = len_tmp;
-		DEBUG("%s: copy data into msg, len=%ld", __func__, used);
+		nip_dbg("%s: copy data into msg, len=%ld", __func__, used);
 		if (!(flags & MSG_TRUNC)) {
 			err = skb_copy_datagram_msg(skb, offset, msg, used);
 			if (err) {
-				DEBUG("%s: copy data failed!", __func__);
+				nip_dbg("%s: copy data failed", __func__);
 				if (!copied)
 					copied = -EFAULT;
 				break;
@@ -1297,7 +1295,7 @@ void tcp_nip_destroy_sock(struct sock *sk)
  */
 static int tcp_nip_do_rcv(struct sock *sk, struct sk_buff *skb)
 {
-	DEBUG("%s: received newip tcp skb, sk_state=%d", __func__, sk->sk_state);
+	nip_dbg("%s: received newip tcp skb, sk_state=%d", __func__, sk->sk_state);
 
 	if (sk->sk_state == TCP_ESTABLISHED) {
 		struct dst_entry *dst = sk->sk_rx_dst;
@@ -1315,7 +1313,7 @@ static int tcp_nip_do_rcv(struct sock *sk, struct sk_buff *skb)
 
 	/* The connection is established in cookie mode to defend against SYN-flood attacks */
 	if (sk->sk_state == TCP_LISTEN)
-		DEBUG("found TCP_LISTEN SOCK!!!");
+		nip_dbg("found TCP_LISTEN SOCK");
 
 	if (tcp_nip_rcv_state_process(sk, skb))
 		goto discard;
@@ -1370,7 +1368,7 @@ static bool tcp_nip_add_backlog(struct sock *sk, struct sk_buff *skb)
 	if (unlikely(sk_add_backlog(sk, skb, limit))) {
 		bh_unlock_sock(sk);
 		__NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPBACKLOGDROP);
-		DEBUG("%s: insert backlog fail.", __func__);
+		nip_dbg("%s: insert backlog fail", __func__);
 		return true;
 	}
 	return false;
@@ -1391,40 +1389,40 @@ static int tcp_nip_rcv(struct sk_buff *skb)
 	int dif = skb->skb_iif;
 
 	if (skb->pkt_type != PACKET_HOST) {
-		DEBUG("%s unknown pkt-type(%u), drop skb.", __func__, skb->pkt_type);
+		nip_dbg("%s unknown pkt-type(%u), drop skb", __func__, skb->pkt_type);
 		goto discard_it;
 	}
 
 	if (!nip_get_tcp_input_checksum(skb)) {
-		DEBUG("%s checksum fail, drop skb.", __func__);
+		nip_dbg("%s checksum fail, drop skb", __func__);
 		goto discard_it;
 	}
 
 	th = (const struct tcphdr *)skb->data;
 
 	if (unlikely(th->doff < sizeof(struct tcphdr) / TCP_NUM_4)) {
-		DEBUG("%s non-four byte alignment, drop skb.", __func__);
+		nip_dbg("%s non-four byte alignment, drop skb", __func__);
 		goto discard_it;
 	}
 
 	sk = __ninet_lookup_skb(&tcp_hashinfo, skb, __tcp_hdrlen(th),
 				th->source, th->dest, dif, &refcounted);
 	if (!sk) {
-		DEBUG("%s: can`t find related sock for skb, will disconnect.", __func__);
+		nip_dbg("%s: can`t find related sock for skb, will disconnect", __func__);
 		goto no_tcp_socket;
 	}
 
 	if (sk->sk_state == TCP_TIME_WAIT) {
 		/* Handles the SK portion of the interrupt state */
-		DEBUG("%s sk_state is TCP_TIME_WAIT, drop skb.", __func__);
+		nip_dbg("%s sk_state is TCP_TIME_WAIT, drop skb", __func__);
 		goto discard_it;
 	}
 	if (sk->sk_state == TCP_NEW_SYN_RECV) {
 		struct request_sock *req = inet_reqsk(sk);
 		struct sock *nsk;
 
-		DEBUG("%s: TCP server into third shake hands! sk->sk_state:%d",
-		      __func__, sk->sk_state);
+		nip_dbg("%s: TCP server into third shake hands, sk->sk_state:%d",
+			__func__, sk->sk_state);
 		sk = req->rsk_listener;
 
 		sock_hold(sk);
@@ -1439,12 +1437,12 @@ static int tcp_nip_rcv(struct sk_buff *skb)
 			nsk = tcp_nip_check_req(sk, skb, req);
 		}
 		if (!nsk || nsk == sk) {
-			DEBUG("%s skb info error and create newsk failure, drop skb.", __func__);
+			nip_dbg("%s skb info error and create newsk failure, drop skb", __func__);
 			reqsk_put(req);
 			goto discard_and_relse;
 		}
 		if (tcp_nip_child_process(sk, nsk, skb)) {
-			DEBUG("%s child process fail, drop skb.", __func__);
+			nip_dbg("%s child process fail, drop skb", __func__);
 			goto discard_and_relse;
 		} else {
 			sock_put(sk);
@@ -1455,15 +1453,15 @@ static int tcp_nip_rcv(struct sk_buff *skb)
 	tcp_nip_fill_cb(skb, th);
 
 	if (tcp_filter(sk, skb)) {
-		DEBUG("%s tcp filter fail, drop skb.", __func__);
+		nip_dbg("%s tcp filter fail, drop skb", __func__);
 		goto discard_and_relse;
 	}
 	th = (const struct tcphdr *)skb->data;
 	skb->dev = NULL;
 
 	if (sk->sk_state == TCP_LISTEN) {
-		DEBUG("%s: TCP server into first shake hands! sk->sk_state:%d",
-		      __func__, sk->sk_state);
+		nip_dbg("%s: TCP server into first shake hands! sk->sk_state:%d",
+			__func__, sk->sk_state);
 		ret  = tcp_nip_do_rcv(sk, skb);
 		goto put_and_return;
 	}
@@ -1473,10 +1471,9 @@ static int tcp_nip_rcv(struct sk_buff *skb)
 	if (!sock_owned_by_user(sk)) {
 		ret = tcp_nip_do_rcv(sk, skb);
 	} else {
-		DEBUG("%s: sock locked by user! put packet into backlog",
-		      __func__);
+		nip_dbg("%s: sock locked by user, put packet into backlog", __func__);
 		if (tcp_nip_add_backlog(sk, skb)) {
-			DEBUG("%s add backlog fail, drop skb.", __func__);
+			nip_dbg("%s add backlog fail, drop skb", __func__);
 			goto discard_and_relse;
 		}
 	}
@@ -1529,7 +1526,7 @@ static void tcp_nip_early_demux(struct sk_buff *skb)
 			if (dst)
 				dst = dst_check(dst, 0);
 			if (dst && inet_sk(sk)->rx_dst_ifindex == skb->skb_iif) {
-				DEBUG("%s: find sock in ehash, set dst for skb", __func__);
+				nip_dbg("%s: find sock in ehash, set dst for skb", __func__);
 				skb_dst_set_noref(skb, dst);
 			}
 		}
@@ -1569,7 +1566,7 @@ void tcp_nip_done(struct sock *sk)
 		this_cpu_dec(*sk->sk_prot->orphan_count);
 		local_bh_enable();
 		sock_put(sk);
-		DEBUG("%s: close sock done!!", __func__);
+		nip_dbg("%s: close sock done", __func__);
 	}
 }
 
@@ -1594,11 +1591,10 @@ int tcp_nip_disconnect(struct sock *sk, int flags)
 	if (old_state == TCP_LISTEN) {
 		sk_ack_backlog = READ_ONCE(sk->sk_ack_backlog);
 		inet_csk_listen_stop(sk);
-		DEBUG("%s: sk_state CLOSE, sk_ack_backlog=%u to %u, sk_max_ack_backlog=%u",
-		      __func__, sk_ack_backlog, READ_ONCE(sk->sk_ack_backlog),
-		      READ_ONCE(sk->sk_max_ack_backlog));
-	} else if (tcp_nip_need_reset(old_state) ||
-		   (tp->snd_nxt != tp->write_seq &&
+		nip_dbg("%s: sk_state CLOSE, sk_ack_backlog=%u to %u, sk_max_ack_backlog=%u",
+			__func__, sk_ack_backlog, READ_ONCE(sk->sk_ack_backlog),
+			READ_ONCE(sk->sk_max_ack_backlog));
+	} else if (tcp_nip_need_reset(old_state) || (tp->snd_nxt != tp->write_seq &&
 		    (1 << old_state) & (TCPF_CLOSING | TCPF_LAST_ACK))) {
 		tcp_nip_send_active_reset(sk, gfp_any());
 		sk->sk_err = ECONNRESET;
@@ -1662,8 +1658,8 @@ struct sock *ninet_csk_accept(struct sock *sk, int flags, int *err, bool kern)
 	u32 sk_max_ack_backlog = READ_ONCE(sk->sk_max_ack_backlog);
 
 	newsk = inet_csk_accept(sk, flags, err, kern);
-	DEBUG("%s: accept %s, sk_ack_backlog_last=%u, sk_max_ack_backlog=%u",
-	      __func__, (newsk ? "ok" : "fail"), sk_ack_backlog_last, sk_max_ack_backlog);
+	nip_dbg("%s: accept %s, sk_ack_backlog_last=%u, sk_max_ack_backlog=%u",
+		__func__, (newsk ? "ok" : "fail"), sk_ack_backlog_last, sk_max_ack_backlog);
 
 	return newsk;
 }
@@ -1751,7 +1747,7 @@ void nip_dbg(const char *fmt, ...)
 {
 	char str[LOG_PRINT_MAX_LEN];
 	va_list args;
-	s32 ret;
+	int len = 0;
 
 	if (!g_nip_debug)
 		return;
@@ -1759,10 +1755,11 @@ void nip_dbg(const char *fmt, ...)
 	memset(str, 0, sizeof(str));
 	(void)memset(&args, 0, sizeof(va_list));
 	va_start(args, fmt);
-	ret = vsnprintf(str, sizeof(str), fmt, args) + 1;
+	len += vsnprintf(str + len, LOG_PRINT_MAX_LEN - len, fmt, args);
 	va_end(args);
-	if (ret < 0 || ret > sizeof(str)) {
+	if (len < 0 || len > LOG_PRINT_MAX_LEN) {
 		pr_crit("nip log len error");
+		printk_once(KERN_ERR "please increase LOG_PRINT_MAX_LEN");
 		return;
 	}
 

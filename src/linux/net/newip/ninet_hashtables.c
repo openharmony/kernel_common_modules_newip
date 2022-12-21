@@ -294,7 +294,7 @@ begin:
 		if (!NINET_MATCH(sk, net, saddr, daddr, ports, dif))
 			continue;
 		if (unlikely(!refcount_inc_not_zero(&sk->sk_refcnt))) {
-			DEBUG("[nip]%s:sk->sk_refcnt == 0!!!!\n", __func__);
+			nip_dbg("[nip]%s:sk->sk_refcnt == 0", __func__);
 			goto out;
 		}
 
@@ -356,12 +356,12 @@ static struct sock *ninet_lhash2_lookup(struct net *net,
 		sk = (struct sock *)icsk;
 		score = nip_tcp_compute_score(sk, net, hnum, daddr, dif, sdif);
 		if (score > hiscore) {
-			DEBUG("%s: find sock in lhash table", __func__);
+			nip_dbg("%s: find sock in lhash table", __func__);
 			result = sk;
 			hiscore = score;
 			reuseport = sk->sk_reuseport;
 			if (reuseport) {
-				DEBUG("%s: find reuseport sock in lhash table", __func__);
+				nip_dbg("%s: find reuseport sock in lhash table", __func__);
 				phash = ninet_ehashfn(net, daddr, hnum, saddr, sport);
 				matches = 1;
 			}
@@ -435,7 +435,7 @@ static int __ninet_check_established(struct inet_timewait_death_row *death_row,
 
 		if (likely(NINET_MATCH(sk2, net,
 				       saddr, daddr, ports, dif))) {
-			DEBUG("%s: found same sk in ehash!\n", __func__);
+			nip_dbg("%s: found same sk in ehash", __func__);
 			goto not_unique;
 		}
 	}
@@ -443,8 +443,7 @@ static int __ninet_check_established(struct inet_timewait_death_row *death_row,
 	/* Must record num and sport now. Otherwise we will see
 	 * in hash table socket with a funny identity.
 	 */
-	DEBUG("%s: add tcp sock into ehash table. sport=%u\n",
-	      __func__, lport);
+	nip_dbg("%s: add tcp sock into ehash table. sport=%u", __func__, lport);
 	inet->inet_num = lport;
 	inet->inet_sport = htons(lport);
 	sk->sk_hash = hash;

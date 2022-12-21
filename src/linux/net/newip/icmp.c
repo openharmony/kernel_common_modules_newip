@@ -36,14 +36,14 @@ int nip_icmp_rcv(struct sk_buff *skb)
 	struct nip_icmp_hdr *hdr = nip_icmp_header(skb);
 	u8 type = hdr->nip_icmp_type;
 
-	DEBUG("rcv newip icmp packet. type = %u\n", type);
+	nip_dbg("rcv newip icmp packet. type = %u", type);
 	switch (type) {
 	case NIP_ARP_NS:
 	case NIP_ARP_NA:
 		ret = nndisc_rcv(skb);
 		break;
 	default:
-		DEBUG("nip icmp packet type error\n");
+		nip_dbg("nip icmp packet type error");
 	}
 	return ret;
 }

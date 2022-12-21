@@ -103,9 +103,8 @@ static void tcp_nip_event_new_data_sent(struct sock *sk, struct sk_buff *skb)
 	tp->snd_nxt = TCP_SKB_CB(skb)->end_seq;
 	tp->packets_out += tcp_skb_pcount(skb);
 	if (!prior_packets || icsk->icsk_pending == ICSK_TIME_EARLY_RETRANS ||
-	    icsk->icsk_pending == ICSK_TIME_LOSS_PROBE) {
+	    icsk->icsk_pending == ICSK_TIME_LOSS_PROBE)
 		tcp_nip_rearm_rto(sk);
-	}
 }
 
 void __tcp_nip_push_pending_frames(struct sock *sk, unsigned int cur_mss,
@@ -141,8 +140,8 @@ u32 __nip_tcp_select_window(struct sock *sk)
 
 		free_space = round_down(free_space, 1 << tp->rx_opt.rcv_wscale);
 		if (free_space < (allowed_space >> TCP_NUM_4) || free_space < mss) {
-			DEBUG("%s rcv_wnd is 0, [allowed|full|free]space=[%u, %u, %u], mss=%u",
-			      __func__, allowed_space, full_space, free_space, mss);
+			nip_dbg("%s rcv_wnd is 0, [allowed|full|free]space=[%u, %u, %u], mss=%u",
+				__func__, allowed_space, full_space, free_space, mss);
 			return 0;
 		}
 	}
@@ -168,9 +167,9 @@ u32 __nip_tcp_select_window(struct sock *sk)
 	 * 1<<rcv_wscale > mss.
 	 */
 	window = ALIGN(window, (1 << tp->rx_opt.rcv_wscale));
-	DEBUG("%s wscale(%u) win change [%u to %u], [allowed|free]space=[%u, %u], mss=%u",
-	      __func__, tp->rx_opt.rcv_wscale, free_space, window,
-	      allowed_space, free_space, mss);
+	nip_dbg("%s wscale(%u) win change [%u to %u], [allowed|free]space=[%u, %u], mss=%u",
+		__func__, tp->rx_opt.rcv_wscale, free_space, window,
+		allowed_space, free_space, mss);
 	return window;
 }
 
@@ -203,8 +202,8 @@ static u16 nip_tcp_select_window(struct sock *sk)
 			NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPWANTZEROWINDOWADV);
 		new_win_bak = new_win;
 		new_win = ALIGN(cur_win, 1 << tp->rx_opt.rcv_wscale);
-		DEBUG("%s when new_win(%u) < cur_win(%u), win change [%u to %u]",
-		      __func__, new_win_bak, cur_win, new_win_bak, new_win);
+		nip_dbg("%s when new_win(%u) < cur_win(%u), win change [%u to %u]",
+			__func__, new_win_bak, cur_win, new_win_bak, new_win);
 	}
 	tp->rcv_wnd = new_win;
 	tp->rcv_wup = tp->rcv_nxt;
@@ -222,8 +221,8 @@ static u16 nip_tcp_select_window(struct sock *sk)
 	 */
 	new_win_bak = new_win;
 	new_win >>= tp->rx_opt.rcv_wscale;
-	DEBUG("%s wscale(%u) win change [%u to %u]",
-	      __func__, tp->rx_opt.rcv_wscale, new_win_bak, new_win);
+	nip_dbg("%s wscale(%u) win change [%u to %u]",
+		__func__, tp->rx_opt.rcv_wscale, new_win_bak, new_win);
 	if (new_win == 0) {
 		tp->pred_flags = 0;
 		if (old_win)
@@ -245,7 +244,6 @@ static void tcp_nip_connect_init(struct sock *sk)
 	const struct dst_entry *dst = __sk_dst_get(sk);
 	struct tcp_sock *tp = tcp_sk(sk);
 	__u8 rcv_wscale = 0;
-	int sysctl_tcp_nip_window_scaling = 0;
 
 	/* Header structure length + timestamp length */
 	tp->tcp_header_len = sizeof(struct tcphdr);
@@ -271,7 +269,7 @@ static void tcp_nip_connect_init(struct sock *sk)
 				  tp->tcp_header_len - sizeof(struct tcphdr) : 0),
 				  &tp->rcv_wnd,
 				  &tp->window_clamp,
-				  sysctl_tcp_nip_window_scaling,
+				  0,
 				  &rcv_wscale,
 				  0);
 
@@ -370,7 +368,7 @@ static unsigned int tcp_nip_syn_options(struct sock *sk, struct sk_buff *skb,
 	unsigned int remaining = MAX_TCP_OPTION_SPACE;
 
 	opts->mss = tcp_nip_advertise_mss(sk);
-	DEBUG("advertise mss %d", opts->mss);
+	nip_dbg("advertise mss %d", opts->mss);
 	remaining -= TCPOLEN_MSS_ALIGNED;
 
 	return MAX_TCP_OPTION_SPACE - remaining;
@@ -407,11 +405,10 @@ static unsigned int tcp_nip_established_options(struct sock *sk, struct sk_buff 
 static void tcp_nip_options_write(__be32 *ptr, struct tcp_sock *tp,
 				  struct tcp_nip_out_options *opts)
 {
-	if (unlikely(opts->mss)) {
+	if (unlikely(opts->mss))
 		*ptr++ = htonl((TCPOPT_MSS << TCP_OPT_MSS_PAYLOAD) |
 			       (TCPOLEN_MSS << TCP_OLEN_MSS_PAYLOAD) |
 			       opts->mss);
-	}
 }
 
 static inline void tcp_nip_event_ack_sent(struct sock *sk, unsigned int pkts,
@@ -528,9 +525,9 @@ static int __tcp_nip_transmit_skb(struct sock *sk, struct sk_buff *skb,
 		th->window = htons(min(tp->rcv_wnd, TCP_NIP_WINDOW_MAX));
 
 	ack = tcb->tcp_flags & TCPHDR_ACK;
-	DEBUG("%s sport=%u, dport=%u, win=%u, sk_rcvbuf=%d, sk_rmem_alloc=%d, ack=%u, skb->len=%u",
-	      __func__, ntohs(inet->inet_sport), ntohs(inet->inet_dport), ntohs(th->window),
-	      sk->sk_rcvbuf, atomic_read(&sk->sk_rmem_alloc), ack, skb->len);
+	nip_dbg("%s sport=%u, dport=%u, win=%u, rcvbuf=%d, sk_rmem_alloc=%d, ack=%u, skb->len=%u",
+		__func__, ntohs(inet->inet_sport), ntohs(inet->inet_dport), ntohs(th->window),
+		sk->sk_rcvbuf, atomic_read(&sk->sk_rmem_alloc), ack, skb->len);
 
 	/* Fill in checksum */
 	check = nip_get_output_checksum_tcp(skb, sk->sk_nip_rcv_saddr, sk->sk_nip_daddr);
@@ -623,9 +620,9 @@ unsigned int tcp_nip_sync_mss(struct sock *sk, u32 pmtu)
 		icsk->icsk_mtup.search_high = pmtu;
 
 	mss_now = tcp_nip_mtu_to_mss(sk, pmtu);
-	DEBUG("%s: sync mtu_to_mss %d", __func__, mss_now);
+	nip_dbg("%s: sync mtu_to_mss %d", __func__, mss_now);
 	mss_now = tcp_bound_to_half_wnd(tp, mss_now);
-	DEBUG("%s: sync bound to half wnd %d", __func__, mss_now);
+	nip_dbg("%s: sync bound to half wnd %d", __func__, mss_now);
 
 	/* And store cached results */
 	icsk->icsk_pmtu_cookie = pmtu;
@@ -633,7 +630,7 @@ unsigned int tcp_nip_sync_mss(struct sock *sk, u32 pmtu)
 		mss_now = min(mss_now, tcp_nip_mtu_to_mss(sk, icsk->icsk_mtup.search_low));
 	tp->mss_cache = mss_now;
 
-	DEBUG("%s: sync final mss %d", __func__, mss_now);
+	nip_dbg("%s: sync final mss %d", __func__, mss_now);
 
 	return mss_now;
 }
@@ -857,9 +854,9 @@ int __nip_send_synack(struct request_sock *req, struct sk_buff *skb)
 	head.total_len = skb->len;
 	err = nip_send_skb(skb);
 	if (err)
-		DEBUG("%s: failed to send skb, skb->len=%u", __func__, head.total_len);
+		nip_dbg("%s: failed to send skb, skb->len=%u", __func__, head.total_len);
 	else
-		DEBUG("%s: send skb ok, skb->len=%u", __func__, head.total_len);
+		nip_dbg("%s: send skb ok, skb->len=%u", __func__, head.total_len);
 
 	return err;
 }
@@ -947,7 +944,7 @@ void tcp_nip_send_fin(struct sock *sk)
 	struct tcp_sock *tp = tcp_sk(sk);
 	u32 cur_mss;
 
-	DEBUG("%s: send fin!", __func__);
+	nip_dbg("%s: send fin", __func__);
 	/* Set the fin position of the last packet to 1 */
 	if (tskb && tcp_nip_send_head(sk)) {
 coalesce:
@@ -976,13 +973,15 @@ void tcp_nip_send_active_reset(struct sock *sk, gfp_t priority)
 {
 	struct sk_buff *skb;
 
-	DEBUG("%s: send RST!", __func__);
+	nip_dbg("%s: send RST", __func__);
 	/* NOTE: No TCP options attached and we never retransmit this. */
 	skb = alloc_skb(MAX_TCP_HEADER, priority);
-	if (!skb) {
-		DEBUG("%s: alloc_skb failed.", __func__);
+	if (!skb)
+		/* If you add log here, there will be an alarm:
+		 * WARNING: Possible unnecessary 'out of memory' message
+		 */
 		return;
-	}
+
 	/* Reserve space for headers and prepare control bits. */
 	skb_reserve(skb, MAX_TCP_HEADER);
 	tcp_nip_init_nondata_skb(skb, tcp_nip_acceptable_seq(sk),
@@ -1050,7 +1049,7 @@ static bool tcp_nip_write_xmit(struct sock *sk, unsigned int mss_now, int nonagl
 		if (tstamp >= g_ack_to_nxt_snd_tstamp) {
 			ntp->nip_ssthresh = g_ssthresh_low_min;
 			snd_num = ntp->nip_ssthresh / mss_now;
-			SSTHRESH_DBG("%s new snd tstamp %u >= %u, ssthresh %u to %u, snd_num=%u",
+			ssthresh_dbg("%s new snd tstamp %u >= %u, ssthresh %u to %u, snd_num=%u",
 				     __func__, tstamp, g_ack_to_nxt_snd_tstamp,
 				     last_nip_ssthresh, ntp->nip_ssthresh, snd_num);
 		}
@@ -1061,7 +1060,8 @@ static bool tcp_nip_write_xmit(struct sock *sk, unsigned int mss_now, int nonagl
 
 		tcp_nip_init_tso_segs(skb, mss_now);
 		snd_wnd_ready = tcp_nip_snd_wnd_test(tp, skb, mss_now);
-		DEBUG("%s %s, skb->len=%u", __func__, (snd_wnd_ready ? str[1] : str[0]), skb->len);
+		nip_dbg("%s %s, skb->len=%u", __func__,
+			(snd_wnd_ready ? str[1] : str[0]), skb->len);
 		if (unlikely(!snd_wnd_ready))
 			break;
 
@@ -1228,7 +1228,7 @@ static int tcp_nip_xmit_probe_skb(struct sock *sk, int urgent, int mib)
 
 	NET_INC_STATS(sock_net(sk), mib);
 	ret = tcp_nip_transmit_skb(sk, skb, 0, (__force gfp_t)0);
-	DEBUG("%s: send %s probe packet, ret=%d", __func__, str[probe_type], ret);
+	nip_dbg("%s: send %s probe packet, ret=%d", __func__, str[probe_type], ret);
 	return ret;
 }
 
@@ -1255,7 +1255,7 @@ int tcp_nip_write_wakeup(struct sock *sk, int mib)
 			err = tcp_fragment(sk, TCP_FRAG_IN_WRITE_QUEUE,
 					   skb, seg_size, mss, GFP_ATOMIC);
 			if (err) {
-				DEBUG("%s tcp_fragment return err=%d", __func__, err);
+				nip_dbg("%s tcp_fragment return err=%d", __func__, err);
 				return -1;
 			}
 		}
@@ -1284,8 +1284,8 @@ void tcp_nip_send_probe0(struct sock *sk)
 	 */
 	if (tp->packets_out || !tcp_nip_send_head(sk)) {
 		/* Cancel probe timer, if it is not required. */
-		DEBUG("%s packets_out(%u) not 0 or send_head is NULL, cancel probe0 timer.",
-		      __func__, tp->packets_out);
+		nip_dbg("%s packets_out(%u) not 0 or send_head is NULL, cancel probe0 timer",
+			__func__, tp->packets_out);
 		icsk->icsk_probes_out = 0;
 		icsk->icsk_backoff = 0;
 		return;
@@ -1297,9 +1297,9 @@ void tcp_nip_send_probe0(struct sock *sk)
 			icsk->icsk_backoff++;
 		icsk->icsk_probes_out++; /* Number of probes +1 */
 		probe_max = TCP_RTO_MAX;
-		DEBUG("%s probe0 send %s, icsk_probes_out=%u, icsk_backoff=%u, probe_max=%u",
-		      __func__, (!err ? "ok" : "fail"), icsk->icsk_probes_out,
-		      icsk->icsk_backoff, probe_max);
+		nip_dbg("%s probe0 send %s, icsk_probes_out=%u, icsk_backoff=%u, probe_max=%u",
+			__func__, (!err ? "ok" : "fail"), icsk->icsk_probes_out,
+			icsk->icsk_backoff, probe_max);
 	} else {
 		/* If packet was not sent due to local congestion,
 		 * do not backoff and do not remember icsk_probes_out.
@@ -1311,11 +1311,11 @@ void tcp_nip_send_probe0(struct sock *sk)
 
 		/* Makes the zero window probe timer time out faster */
 		probe_max = TCP_RESOURCE_PROBE_INTERVAL;
-		DEBUG("%s probe0 not sent due to local congestion, make timer time out faster",
-		      __func__);
+		nip_dbg("%s probe0 not sent due to local congestion, make timer time out faster",
+			__func__);
 	}
 
 	when = tcp_probe0_when(sk, probe_max);
-	DEBUG("%s restart probe0 timer, when=%u, probe_max=%u", __func__, when, probe_max);
+	nip_dbg("%s restart probe0 timer, when=%u, probe_max=%u", __func__, when, probe_max);
 	inet_csk_reset_xmit_timer(sk, ICSK_TIME_PROBE0, when, TCP_RTO_MAX);
 }

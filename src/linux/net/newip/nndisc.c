@@ -286,10 +286,11 @@ static void nndisc_send_ns(struct net_device *dev,
 	head.nexthdr = IPPROTO_NIP_ICMP;
 
 	skb = alloc_skb(len, 0);
-	if (!skb) {
-		DEBUG("%s: no space for skbuff!", __func__);
+	if (!skb)
+		/* If you add log here, there will be an alarm:
+		 * WARNING: Possible unnecessary 'out of memory' message
+		 */
 		return;
-	}
 
 	skb->protocol = htons(ETH_P_NEWIP);
 	skb->dev = dev;
@@ -336,7 +337,7 @@ static void nndisc_send_ns(struct net_device *dev,
 	/* DST is set to SKB, and output is used to release SKB regardless of success or failure */
 	ret = dst_output(net, sk, skb);
 	if (ret)
-		DEBUG("%s: dst output fail.", __func__);
+		nip_dbg("%s: dst output fail", __func__);
 }
 
 static void nndisc_solicit(struct neighbour *neigh, struct sk_buff *skb)
@@ -365,7 +366,7 @@ static void nndisc_solicit(struct neighbour *neigh, struct sk_buff *skb)
 		}
 		read_unlock_bh(&idev->lock);
 	} else {
-		DEBUG("%s:idev don't exist.", __func__);
+		nip_dbg("%s:idev don't exist", __func__);
 	}
 	rcu_read_unlock();
 }
@@ -413,10 +414,12 @@ static void nndisc_send_na(struct net_device *dev,
 	head.nexthdr = IPPROTO_NIP_ICMP;
 
 	skb = alloc_skb(len, 0);
-	if (!skb) {
-		DEBUG("%s: no space for skbuff!", __func__);
+	if (!skb)
+		/* If you add log here, there will be an alarm:
+		 * WARNING: Possible unnecessary 'out of memory' message
+		 */
 		return;
-	}
+
 	skb->protocol = htons(ETH_P_NEWIP);
 	skb->ip_summed = csummode;
 	skb->csum = 0;
@@ -462,7 +465,7 @@ static void nndisc_send_na(struct net_device *dev,
 	skb_dst_set(skb, dst);
 	ret = dst_output(dev_net(skb->dev), sk, skb);
 	if (ret)
-		DEBUG("%s: dst output fail.", __func__);
+		nip_dbg("%s: dst output fail", __func__);
 }
 
 bool nip_addr_local(struct net_device *dev, struct nip_addr *addr)
@@ -504,13 +507,13 @@ int nndisc_rcv_ns(struct sk_buff *skb)
 
 	p = decode_nip_addr(p, &addr);
 	if (!p) {
-		DEBUG("failure when decode source address!");
+		nip_dbg("failure when decode source address");
 		err = -EFAULT;
 		goto out;
 	}
 
 	if (nip_addr_invalid(&addr)) {
-		DEBUG("%s: icmp hdr addr invalid, bitlen=%u.", __func__, addr.bitlen);
+		nip_dbg("%s: icmp hdr addr invalid, bitlen=%u", __func__, addr.bitlen);
 		err = -EFAULT;
 		goto out;
 	}
@@ -525,7 +528,7 @@ int nndisc_rcv_ns(struct sk_buff *skb)
 
 	/* checksum parse*/
 	if (!nip_get_nndisc_rcv_checksum(skb, p)) {
-		DEBUG("%s:ns ICMP checksum failed, drop the packet", __func__);
+		nip_dbg("%s:ns ICMP checksum failed, drop the packet", __func__);
 		err = -EINVAL;
 		goto out;
 	}
@@ -533,8 +536,7 @@ int nndisc_rcv_ns(struct sk_buff *skb)
 	neigh = __neigh_lookup(&nnd_tbl, &NIPCB(skb)->srcaddr, dev, lladdr ||
 			       !dev->addr_len);
 	if (neigh) {
-		neigh_update(neigh, lladdr, NUD_STALE, NEIGH_UPDATE_F_OVERRIDE,
-			     0);
+		neigh_update(neigh, lladdr, NUD_STALE, NEIGH_UPDATE_F_OVERRIDE, 0);
 		neigh_release(neigh);
 	}
 
@@ -559,16 +561,14 @@ int nndisc_rcv_na(struct sk_buff *skb)
 	memcpy(lladdr, p, len);
 
 	if (!nip_get_nndisc_rcv_checksum(skb, p + len)) {
-		DEBUG("%s:na ICMP checksum failed! drop the packet!"
-		      , __func__);
+		nip_dbg("%s:na ICMP checksum failed, drop the packet", __func__);
 		kfree_skb(skb);
 		return 0;
 	}
 
 	neigh = neigh_lookup(&nnd_tbl, &NIPCB(skb)->srcaddr, dev);
 	if (neigh) {
-		neigh_update(neigh, lladdr, NUD_REACHABLE,
-			     NEIGH_UPDATE_F_OVERRIDE, 0);
+		neigh_update(neigh, lladdr, NUD_REACHABLE, NEIGH_UPDATE_F_OVERRIDE, 0);
 		neigh_release(neigh);
 		kfree_skb(skb);
 		return 0;
@@ -591,7 +591,7 @@ int nndisc_rcv(struct sk_buff *skb)
 		ret = nndisc_rcv_na(skb);
 		break;
 	default:
-		DEBUG("arp packet type error");
+		nip_dbg("nd packet type error");
 	}
 
 	return ret;

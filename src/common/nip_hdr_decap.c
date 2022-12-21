@@ -273,10 +273,11 @@ int nip_hdr_parse(unsigned char *rcv_buf, unsigned int buf_len, struct nip_hdr_d
 
 	niph->rcv_buf_len = buf_len;
 	while (i < num) {
+		int len;
+
 		if (i >= FACTORY_NUM_MAX)
 			break;
-		int len = hdr_parse_factory[i](buf, bitmap[i], niph);
-
+		len = hdr_parse_factory[i](buf, bitmap[i], niph);
 		if (len < 0)
 			return len;
 

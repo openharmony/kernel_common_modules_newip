@@ -127,6 +127,5 @@ int nip_getsockopt(struct sock *sk, int level,
 int nip_addrconf_get_ifaddr(struct net *net, unsigned int cmd, void __user *arg);
 
 void nip_dbg(const char *fmt, ...);
-#define DEBUG(format, ...) nip_dbg(format, ##__VA_ARGS__)
 
 #endif

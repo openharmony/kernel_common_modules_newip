@@ -6,7 +6,6 @@
  */
 #ifdef CONFIG_NEWIP_HOOKS
 
-/* include/trace/hooks/nip_hooks.h */
 #undef TRACE_SYSTEM
 #define TRACE_SYSTEM       nip_hooks   /* Header file name */
 #define TRACE_INCLUDE_PATH trace/hooks /* Header file directory */
@@ -20,9 +19,15 @@
 struct net;
 struct nip_addr;
 DECLARE_HOOK(ninet_ehashfn_hook,
-      TP_PROTO(const struct net *net, const struct nip_addr *laddr, const u16 lport,
-               const struct nip_addr *faddr, const __be16 fport, u32 *ret),
-      TP_ARGS(net, laddr, lport, faddr, fport, ret)
+		TP_PROTO(const struct net *net, const struct nip_addr *laddr, const u16 lport,
+			const struct nip_addr *faddr, const __be16 fport, u32 *ret),
+		TP_ARGS(net, laddr, lport, faddr, fport, ret)
+);
+
+struct net_device;
+DECLARE_HOOK(ninet_gifconf_hook,
+		TP_PROTO(struct net_device *dev, char __user *buf, int len, int size, int *ret),
+		TP_ARGS(dev, buf, len, size, ret)
 );
 #endif /* end of _TRACE_HOOK_NIP_H */
 
@@ -30,3 +35,4 @@ DECLARE_HOOK(ninet_ehashfn_hook,
 #include <trace/define_trace.h>
 
 #endif /* end of CONFIG_NEWIP_HOOKS */
+
