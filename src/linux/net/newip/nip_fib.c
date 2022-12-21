@@ -94,10 +94,8 @@ struct nip_fib_node *nip_fib_locate(struct hlist_head *nip_tb_head,
 	h = &nip_tb_head[hash];
 
 	hlist_for_each_entry_rcu(fib_node, h, fib_hlist) {
-		if (nip_addr_eq
-		    (&fib_node->nip_route_info->rt_dst, &nip_any_addr)) {
+		if (nip_addr_eq(&fib_node->nip_route_info->rt_dst, &nip_any_addr))
 			return fib_node;
-		}
 	}
 
 	return NULL;
@@ -126,7 +124,7 @@ int nip_fib_add(struct hlist_head *nip_tb_head, struct nip_rt_info *rt)
 
 	new_node = nip_node_alloc();
 	if (!new_node) {
-		DEBUG("%s: fail to alloc mem.", __func__);
+		nip_dbg("%s: fail to alloc mem", __func__);
 		err = -ENOMEM;
 		goto fail;
 	}
@@ -201,8 +199,8 @@ static void nip_fib_clean_hash(struct net *net, struct hlist_head *nip_tb_head,
 				nip_addr_to_str(&fn->nip_route_info->gateway, gateway,
 						NIP_ADDR_BIT_LEN_MAX);
 
-				DEBUG("%s: try to del rt_info, rt_dst=%s, gateway=%s",
-				      __func__, dst, gateway);
+				nip_dbg("%s: try to del rt_info, rt_dst=%s, gateway=%s",
+					__func__, dst, gateway);
 				nip_fib_del(fn->nip_route_info, &info);
 			}
 		}
@@ -284,8 +282,8 @@ int __init nip_fib_init(void)
 	if (!nip_fib_node_kmem)
 		goto out;
 
-	DEBUG("nip_fib_node size is %lu",
-	      sizeof(struct nip_fib_node) + sizeof(struct nip_rt_info));
+	nip_dbg("nip_fib_node size is %lu",
+		sizeof(struct nip_fib_node) + sizeof(struct nip_rt_info));
 
 	ret = register_pernet_subsys(&nip_fib_net_ops);
 	if (ret)

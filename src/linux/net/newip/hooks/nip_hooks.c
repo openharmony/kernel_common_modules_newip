@@ -10,4 +10,5 @@
 
 #ifdef CONFIG_NEWIP_HOOKS
 EXPORT_TRACEPOINT_SYMBOL_GPL(ninet_ehashfn_hook);
+EXPORT_TRACEPOINT_SYMBOL_GPL(ninet_gifconf_hook);
 #endif

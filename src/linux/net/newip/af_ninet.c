@@ -89,7 +89,7 @@ static int ninet_create(struct net *net, struct socket *sock, int protocol,
 
 	num = atomic_add_return(1, &g_nip_socket_number);
 	if (num > NIP_MAX_SOCKET_NUM) {
-		DEBUG("The number of socket is biger than 1024!");
+		nip_dbg("The number of socket is biger than 1024");
 		err = -EPERM;
 		goto number_sub;
 	}
@@ -178,14 +178,14 @@ static int ninet_create(struct net *net, struct socket *sock, int protocol,
 		}
 	}
 out:
-	DEBUG("The final number of socket is: %d", num);
+	nip_dbg("The final number of socket is: %d", num);
 	return err;
 out_rcu_unlock:
 	rcu_read_unlock();
 number_sub:
 	atomic_dec_if_positive(&g_nip_socket_number);
 	num = atomic_read(&g_nip_socket_number);
-	DEBUG("The final number of socket is: %d", num);
+	nip_dbg("The final number of socket is: %d", num);
 	goto out;
 }
 
@@ -210,7 +210,7 @@ int ninet_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 		return -EACCES;
 
 	if (nip_bind_addr_check(net, &addr->sin_addr) == false) {
-		DEBUG("%s: binding-addr invalid, bitlen=%u.", __func__, addr->sin_addr.bitlen);
+		nip_dbg("%s: binding-addr invalid, bitlen=%u", __func__, addr->sin_addr.bitlen);
 		return -EADDRNOTAVAIL;
 	}
 	lock_sock(sk);
@@ -426,14 +426,14 @@ int ninet_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 	struct sock *sk = sock->sk;
 	struct net *net = sock_net(sk);
 
-	DEBUG("%s: cmd=0x%x.", __func__, cmd);
+	nip_dbg("%s: cmd=0x%x", __func__, cmd);
 	switch (cmd) {
 	case SIOCADDRT:
 	case SIOCDELRT: {
 		struct nip_rtmsg rtmsg;
 
 		if (copy_from_user(&rtmsg, (void __user *)arg, sizeof(rtmsg))) {
-			DEBUG("%s: fail to copy route cfg data.", __func__);
+			nip_dbg("%s: fail to copy route cfg data", __func__);
 			return -EFAULT;
 		}
 		return nip_route_ioctl(net, cmd, &rtmsg);
@@ -447,7 +447,7 @@ int ninet_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 
 	default:
 		if (!sk->sk_prot->ioctl) {
-			DEBUG("%s: sock sk_prot ioctl is null, cmd=0x%x.", __func__, cmd);
+			nip_dbg("%s: sock sk_prot ioctl is null, cmd=0x%x", __func__, cmd);
 			return -ENOIOCTLCMD;
 		}
 		return sk->sk_prot->ioctl(sk, cmd, arg);
@@ -479,11 +479,11 @@ static int ninet_compat_routing_ioctl(struct sock *sk, unsigned int cmd,
 	    get_user(rt.rtmsg_metric, &ur->rtmsg_metric) ||
 	    get_user(rt.rtmsg_info, &ur->rtmsg_info) ||
 	    get_user(rt.rtmsg_flags, &ur->rtmsg_flags)) {
-		DEBUG("%s: fail to convert input para, cmd=0x%x.", __func__, cmd);
+		nip_dbg("%s: fail to convert input para, cmd=0x%x", __func__, cmd);
 		return -EFAULT;
 	}
 
-	DEBUG("%s: cmd=0x%x.", __func__, cmd);
+	nip_dbg("%s: cmd=0x%x", __func__, cmd);
 	return nip_route_ioctl(sock_net(sk), cmd, &rt);
 }
 
@@ -600,18 +600,18 @@ out:
 	return ret;
 
 out_permanent:
-	DEBUG("Attempt to override permanent protocol %d", protocol);
+	nip_dbg("Attempt to override permanent protocol %d", protocol);
 	goto out;
 
 out_illegal:
-	DEBUG("Ignoring attempt to register invalid socket type %d", p->type);
+	nip_dbg("Ignoring attempt to register invalid socket type %d", p->type);
 	goto out;
 }
 
 void ninet_unregister_protosw(struct inet_protosw *p)
 {
 	if (INET_PROTOSW_PERMANENT & p->flags) {
-		DEBUG("Attempt to unregister permanent protocol %d", p->protocol);
+		nip_dbg("Attempt to unregister permanent protocol %d", p->protocol);
 	} else {
 		spin_lock_bh(&inetsw_nip_lock);
 		list_del_rcu(&p->list);
@@ -661,13 +661,13 @@ static int __init ninet_init(void)
 
 	sock_skb_cb_check_size(sizeof(struct ninet_skb_parm));
 
-	DEBUG("NET: start to init nip network.");
+	nip_dbg("NET: start to init nip network");
 	/* register the socket-side information for ninet_create */
 	for (r = &inetsw_nip[0]; r < &inetsw_nip[SOCK_MAX]; ++r)
 		INIT_LIST_HEAD(r);
 
 	if (!newip_mod_enabled()) {
-		DEBUG("Loaded, but administratively disabled, reboot required to enable");
+		nip_dbg("Loaded, but administratively disabled, reboot required to enable");
 		goto out;
 	}
 
@@ -677,31 +677,31 @@ static int __init ninet_init(void)
 
 	err = proto_register(&nip_udp_prot, 1);
 	if (err) {
-		DEBUG("failed to register udp proto!");
+		nip_dbg("failed to register udp proto");
 		goto out_udp_register_fail;
 	}
 
 	err = sock_register(&ninet_family_ops);
 	if (err) {
-		DEBUG("failed to register newip_family_ops!");
+		nip_dbg("failed to register newip_family_ops");
 		goto out_sock_register_fail;
 	}
 
 	err = register_pernet_subsys(&ninet_net_ops);
 	if (err) {
-		DEBUG("failed to register ninet_net_ops!");
+		nip_dbg("failed to register ninet_net_ops");
 		goto register_pernet_fail;
 	}
 
 	err = nip_icmp_init();
 	if (err) {
-		DEBUG("nip_icmp_init failed!");
+		nip_dbg("nip_icmp_init failed");
 		goto nip_icmp_fail;
 	}
 
 	err = nndisc_init();
 	if (err) {
-		DEBUG("nndisc_init failed!");
+		nip_dbg("nndisc_init failed");
 		goto nndisc_fail;
 	}
 
@@ -715,32 +715,32 @@ static int __init ninet_init(void)
 
 	err = nip_udp_init();
 	if (err) {
-		DEBUG("failed to init udp layer!");
+		nip_dbg("failed to init udp layer");
 		goto udp_fail;
 	}
 
 	err = tcp_nip_init();
 	if (err) {
-		DEBUG("failed to init tcp layer!");
+		nip_dbg("failed to init tcp layer");
 		goto tcp_fail;
 	} else {
-		DEBUG("nip_tcp_init ok!");
+		nip_dbg("nip_tcp_init ok");
 	}
 
 	err = nip_packet_init();
 	if (err) {
-		DEBUG("failed to register to l2 layer!");
+		nip_dbg("failed to register to l2 layer");
 		goto nip_packet_fail;
 	}
 
 #ifdef CONFIG_NEWIP_HOOKS
 	err = ninet_hooks_register();
 	if (err) {
-		DEBUG("failed to register to nip hooks");
+		nip_dbg("failed to register to nip hooks");
 		goto nip_packet_fail;
 	}
 #endif
-	DEBUG("NewIP: init newip address family ok!");
+	nip_dbg("NewIP: init newip address family ok");
 
 out:
 	return err;
@@ -762,7 +762,7 @@ register_pernet_fail:
 out_sock_register_fail:
 	proto_unregister(&nip_udp_prot);
 out_udp_register_fail:
-	DEBUG("newip family init failed!!!");
+	nip_dbg("newip family init failed");
 	goto out;
 }
 

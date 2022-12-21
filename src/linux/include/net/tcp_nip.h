@@ -117,11 +117,11 @@ static inline void tcp_nip_check_probe_timer(struct sock *sk)
 
 	if (!tcp_sk(sk)->packets_out && !inet_csk(sk)->icsk_pending) {
 		when = tcp_probe0_base(sk);
-		DEBUG("%s start probe0 timer, when=%u, RTO MAX=%u", __func__, when, TCP_RTO_MAX);
+		nip_dbg("%s start probe0 timer, when=%u, RTO MAX=%u", __func__, when, TCP_RTO_MAX);
 		inet_csk_reset_xmit_timer(sk, ICSK_TIME_PROBE0, when, TCP_RTO_MAX);
 	} else if (inet_csk(sk)->icsk_pending != ICSK_TIME_PROBE0) {
-		DEBUG("%s can`t start probe0 timer, packets_out=%u, icsk_pending=%u",
-		      __func__, tcp_sk(sk)->packets_out, inet_csk(sk)->icsk_pending);
+		nip_dbg("%s can`t start probe0 timer, packets_out=%u, icsk_pending=%u",
+			__func__, tcp_sk(sk)->packets_out, inet_csk(sk)->icsk_pending);
 	}
 }
 

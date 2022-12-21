@@ -8,7 +8,7 @@ source "net/newip/hooks/Kconfig"
 # net/newip/Kconfig
 config NEWIP
 	def_bool $(success,$(srctree)/scripts/ohos-check-dir.sh $(srctree)/net/newip)
-	depends on INET
+	depends on INET && NET
 	help
 	  Support for NewIP.
 

@@ -89,7 +89,7 @@ extern bool g_nip_debug;
 
 /* Debugging of threshold change */
 extern int g_rtt_ssthresh_debug;
-#define SSTHRESH_DBG(fmt, ...) \
+#define ssthresh_dbg(fmt, ...) \
 do { \
 	if (g_rtt_ssthresh_debug) \
 		pr_crit(fmt, ##__VA_ARGS__); \
@@ -97,7 +97,7 @@ do { \
 
 /* Debugging of packet retransmission after ACK */
 extern int g_ack_retrans_debug;
-#define RETRANS_DBG(fmt, ...) \
+#define retrans_dbg(fmt, ...) \
 do { \
 	if (g_ack_retrans_debug) \
 		pr_crit(fmt, ##__VA_ARGS__); \

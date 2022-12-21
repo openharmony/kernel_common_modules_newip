@@ -162,7 +162,6 @@ struct sock *__nip_udp_lib_lookup(struct net *net,
 
 	if (hslot->count > NIP_UDP_HSLOT_COUNT) {
 		hash2 = nip_udp_portaddr_hash(net, daddr, hnum);
-		DEBUG("hash2 is: 0x%x", hash2);
 		slot2 = hash2 & udptable->mask;
 		hslot2 = &udptable->hash2[slot2];
 		if (hslot->count < hslot2->count)
@@ -200,7 +199,6 @@ begin:
 			result = sk;
 			badness = score;
 		}
-		DEBUG("score is: %d", score);
 	}
 	return result;
 }
@@ -242,10 +240,8 @@ int nip_udp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 
 	/* copy data */
 	datalen = copy_to_iter(skb->data, copied, &msg->msg_iter);
-
 	if (datalen < 0) {
-		DEBUG("%s: copy to iter in failure! len = %d", __func__,
-		      datalen);
+		nip_dbg("%s: copy to iter in failure, len=%d", __func__, datalen);
 		err = -EFAULT;
 		return err;
 	}
@@ -317,8 +313,7 @@ int nip_udp_input(struct sk_buff *skb)
 	struct udphdr *udphead = udp_hdr(skb);
 
 	if (!nip_get_udp_input_checksum(skb)) {
-		DEBUG("%s: checksum failed, drop the packet. ",
-		      __func__);
+		nip_dbg("%s: checksum failed, drop the packet", __func__);
 		kfree_skb(skb);
 		rc = -1;
 		goto end;
@@ -327,8 +322,9 @@ int nip_udp_input(struct sk_buff *skb)
 	sk = __nip_udp_lib_lookup_skb(skb, udphead->source,
 				      udphead->dest, &udp_table);
 	if (!sk) {
-		DEBUG("%s: dport not match, drop the packet. sport=%u, dport=%u, data_len=%u.",
-		      __func__, ntohs(udphead->source), ntohs(udphead->dest), ntohs(udphead->len));
+		nip_dbg("%s: dport not match, drop the packet. sport=%u, dport=%u, data_len=%u",
+			__func__, ntohs(udphead->source),
+			ntohs(udphead->dest), ntohs(udphead->len));
 		kfree_skb(skb);
 		rc = -1;
 		goto end;
@@ -353,19 +349,18 @@ int nip_udp_output(struct sock *sk, struct msghdr *msg, size_t len)
 	int err = 0;
 	struct inet_sock *inet;
 
-	if (!sin) {
+	if (!sin)
 		/* Currently, udp socket Connect function is not implemented.
 		 * The destination address and port must be directly provided by Sendto
 		 */
 		return -EDESTADDRREQ;
-	}
 
 	if (sin->sin_family != AF_NINET) {
-		DEBUG("%s: sin_family false.", __func__);
+		nip_dbg("%s: sin_family false", __func__);
 		return -EAFNOSUPPORT;
 	}
 	if (nip_addr_invalid(&sin->sin_addr)) {
-		DEBUG("%s: sin_addr false.", __func__);
+		nip_dbg("%s: sin_addr false", __func__);
 		return -EFAULT;
 	}
 
