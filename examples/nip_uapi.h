@@ -28,4 +28,4 @@ struct thread_args {
 	struct sockaddr_nin si_server;
 };
 
-#endif /*_NIP_UAPI_H*/
+#endif /*_NIP_UAPI_H */

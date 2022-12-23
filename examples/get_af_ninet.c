@@ -45,12 +45,12 @@ void _get_af_ninet(void)
 	FILE *fn = fopen(AF_NINET_PATH, "r");
 
 	if (!fn) {
-		printf("fail to open %s.\n\n", AF_NINET_PATH);
+		printf("fail to open %s\n\n", AF_NINET_PATH);
 		return;
 	}
 
 	if (fgets(tmp, AF_NINET_LENTH, fn) == NULL) {
-		printf("fail to gets %s.\n\n", AF_NINET_PATH);
+		printf("fail to gets %s\n\n", AF_NINET_PATH);
 		fclose(fn);
 		return;
 	}

@@ -44,8 +44,8 @@
 
 void *recv_send(void *args)
 {
-	char buf[BUFLEN] = {0};
 	int cfd, ret;
+	char buf[BUFLEN] = {0};
 
 	memcpy(&cfd, args, sizeof(int));
 	for (int i = 0; i < PKTCNT; i++) {

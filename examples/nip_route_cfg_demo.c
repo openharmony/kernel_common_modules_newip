@@ -90,36 +90,36 @@ int main(int argc, char **argv)
 
 	if (argc == DEMO_INPUT_1) {
 		if (!strcmp(*(argv + 1), "server")) {
-			printf("server cfg route, dst-addr=0x%x02.\n", client_addr[INDEX_0]);
+			printf("server cfg route, dst-addr=0x%02x\n", client_addr[INDEX_0]);
 			dst_addr = client_addr;
 			dst_addr_len = 1;
 		} else if (!strcmp(*(argv + 1), "client")) {
-			printf("client cfg route, dst-addr=0x%02x%02x.\n",
+			printf("client cfg route, dst-addr=0x%02x%02x\n",
 			       server_addr[INDEX_0], server_addr[INDEX_1]);
 			dst_addr = server_addr;
 			dst_addr_len = 2;
 		} else {
-			printf("invalid route cfg input.\n");
+			printf("invalid route cfg input\n");
 			return -1;
 		}
 	} else {
-		printf("unsupport route cfg input.\n");
+		printf("unsupport route cfg input\n");
 		return -1;
 	}
 
 	ret = nip_get_ifindex(NIC_NAME, &ifindex);
 	if (ret != 0) {
-		printf("get %s ifindex fail, ret=%d.\n", NIC_NAME, ret);
+		printf("get %s ifindex fail, ret=%d\n", NIC_NAME, ret);
 		return -1;
 	}
 
 	ret = nip_route_add(ifindex, dst_addr, dst_addr_len, NULL, 0);
 	if (ret != 0) {
-		printf("get %s ifindex fail, ret=%d.\n", NIC_NAME, ret);
+		printf("get %s ifindex fail, ret=%d\n", NIC_NAME, ret);
 		return -1;
 	}
 
-	printf("%s %s(ifindex=%d) cfg route success.\n", *argv, NIC_NAME, ifindex);
+	printf("%s %s(ifindex=%d) cfg route success\n", *argv, NIC_NAME, ifindex);
 	return 0;
 }
 

@@ -57,13 +57,11 @@ int nip_udp_get_port(struct sock *sk, unsigned short snum)
 {
 	unsigned int hash2_nulladdr, hash2_partial;
 
-	hash2_nulladdr = nip_udp_portaddr_hash(sock_net(sk),
-					       &nip_any_addr, snum);
+	hash2_nulladdr = nip_udp_portaddr_hash(sock_net(sk), &nip_any_addr, snum);
 	/* hash2_partial is the hash result of nip_addr only */
-	hash2_partial = nip_udp_portaddr_hash(sock_net(sk),
-					      &sk->sk_nip_rcv_saddr, 0);
+	hash2_partial = nip_udp_portaddr_hash(sock_net(sk), &sk->sk_nip_rcv_saddr, 0);
 
-	/* precompute partial secondary hash*/
+	/* precompute partial secondary hash */
 	udp_sk(sk)->udp_portaddr_hash = hash2_partial;
 	return udp_lib_get_port(sk, snum, hash2_nulladdr);
 }
@@ -147,6 +145,7 @@ static struct sock *nip_udp_lib_lookup2(struct net *net,
 	return result;
 }
 
+/* rcu_read_lock() must be held */
 struct sock *__nip_udp_lib_lookup(struct net *net,
 				  const struct nip_addr *saddr, __be16 sport,
 				  const struct nip_addr *daddr, __be16 dport,
@@ -154,52 +153,32 @@ struct sock *__nip_udp_lib_lookup(struct net *net,
 				  struct sk_buff *skb)
 {
 	unsigned short hnum = ntohs(dport);
-	unsigned int hash2, slot2, slot = udp_hashfn(net, hnum, udptable->mask);
-	unsigned int old_slot2;
-	int score, badness;
-	struct sock *sk, *result;
-	struct udp_hslot *hslot2, *hslot = &udptable->hash[slot];
+	unsigned int hash2, slot2;
+	struct udp_hslot *hslot2;
+	struct sock *result;
 
-	if (hslot->count > NIP_UDP_HSLOT_COUNT) {
-		hash2 = nip_udp_portaddr_hash(net, daddr, hnum);
-		slot2 = hash2 & udptable->mask;
-		hslot2 = &udptable->hash2[slot2];
-		if (hslot->count < hslot2->count)
-			goto begin;
+	hash2 = nip_udp_portaddr_hash(net, daddr, hnum);
+	slot2 = hash2 & udptable->mask;
+	hslot2 = &udptable->hash2[slot2];
 
-		result = nip_udp_lib_lookup2(net, saddr, sport,
-					     daddr, hnum, dif, sdif,
-					     hslot2, skb);
-		if (!result) {
-			old_slot2 = slot2;
+	/* Lookup connected or non-wildcard sockets */
+	result = nip_udp_lib_lookup2(net, saddr, sport,
+				     daddr, hnum, dif, sdif,
+				     hslot2, skb);
+	if (!IS_ERR_OR_NULL(result))
+		goto done;
 
-			hash2 = nip_udp_portaddr_hash(net, &nip_any_addr, hnum);
-			slot2 = hash2 & udptable->mask;
-			/* avoid searching the same slot again. */
-			if (unlikely(slot2 == old_slot2))
-				return result;
+	/* Lookup wildcard sockets */
+	hash2 = nip_udp_portaddr_hash(net, &nip_any_addr, hnum);
+	slot2 = hash2 & udptable->mask;
+	hslot2 = &udptable->hash2[slot2];
 
-			hslot2 = &udptable->hash2[slot2];
-			if (hslot->count < hslot2->count)
-				goto begin;
-
-			result = nip_udp_lib_lookup2(net, saddr, sport,
-						     daddr, hnum, dif, sdif,
-						     hslot2, skb);
-		}
-		return result;
-	}
-begin:
-	result = NULL;
-	badness = -1;
-	sk_for_each_rcu(sk, &hslot->head) {
-		score = nip_udp_compute_score(sk, net, saddr, sport, daddr,
-					      hnum, dif, sdif);
-		if (score > badness) {
-			result = sk;
-			badness = score;
-		}
-	}
+	result = nip_udp_lib_lookup2(net, saddr, sport,
+				     &nip_any_addr, hnum, dif, sdif,
+				     hslot2, skb);
+done:
+	if (IS_ERR(result))
+		return NULL;
 	return result;
 }
 
@@ -227,7 +206,7 @@ int nip_udp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 	int err;
 
 	off = sk_peek_offset(sk, flags);
-	peeking = off;	/* Fetch the SKB from the queue */
+	peeking = off; /* Fetch the SKB from the queue */
 	skb = __skb_recv_udp(sk, flags, noblock, &off, &err);
 	if (!skb)
 		return err;

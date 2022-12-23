@@ -25,21 +25,19 @@
 #include "nip_checksum.h"
 #include "tcp_nip_parameter.h"
 
-#define OPTION_SACK_ADVERTISE	BIT(0)
-#define OPTION_TS		BIT(1)
-#define OPTION_MD5		BIT(2)
-#define OPTION_WSCALE		BIT(3)
-#define OPTION_FAST_OPEN_COOKIE	BIT(8)
+#define OPTION_SACK_ADVERTISE   BIT(0)
+#define OPTION_TS               BIT(1)
+#define OPTION_MD5              BIT(2)
+#define OPTION_WSCALE           BIT(3)
+#define OPTION_FAST_OPEN_COOKIE BIT(8)
 
 /* Store the options contained in TCP when sending TCP packets */
 struct tcp_nip_out_options {
-	u16 options;		/* bit field of OPTION_* */
-	u16 mss;		/* If it is zero, the MSS option is disabled */
+	u16 options;        /* bit field of OPTION_* */
+	u16 mss;            /* If it is zero, the MSS option is disabled */
 
-	u8 ws;			/* window scale, 0 to disable, If the window is enlarged,
-				 * 0 indicates that the option is disabled
-				 */
-	__u32 tsval, tsecr;	/* need to include OPTION_TS */
+	u8 ws;              /* window scale, 0 to disable */
+	__u32 tsval, tsecr; /* need to include OPTION_TS */
 };
 
 static bool tcp_nip_write_xmit(struct sock *sk, unsigned int mss_now, int nonagle,
@@ -146,14 +144,14 @@ u32 __nip_tcp_select_window(struct sock *sk)
 		}
 	}
 
-	if (g_nip_tcp_rcv_win_enable) {
-		if (g_ssthresh_enable == 1)
+	if (get_nip_tcp_rcv_win_enable()) {
+		if (get_ssthresh_enable())
 			free_space = free_space > ntp->nip_ssthresh ?
 				     ntp->nip_ssthresh : free_space;
 		else
 			free_space = free_space > tp->rcv_ssthresh ? tp->rcv_ssthresh : free_space;
 	} else {
-		free_space = free_space > g_ssthresh_high ? g_ssthresh_high : free_space;
+		free_space = free_space > get_ssthresh_high() ? get_ssthresh_high() : free_space;
 	}
 
 	/* Don't do rounding if we are using window scaling, since the
@@ -235,9 +233,9 @@ static u16 nip_tcp_select_window(struct sock *sk)
 }
 
 /* Function
- *	Initialize transport layer parameters.
+ *    Initialize transport layer parameters.
  * Parameter
- *	sk: transmission control block.
+ *    sk: transmission control block.
  */
 static void tcp_nip_connect_init(struct sock *sk)
 {
@@ -273,7 +271,7 @@ static void tcp_nip_connect_init(struct sock *sk)
 				  &rcv_wscale,
 				  0);
 
-	tp->rx_opt.rcv_wscale = g_wscale_enable == 1 ? g_wscale : rcv_wscale;
+	tp->rx_opt.rcv_wscale = get_wscale_enable() ? get_wscale() : rcv_wscale;
 	tp->rcv_ssthresh = tp->rcv_wnd;
 
 	sk->sk_err = 0;
@@ -290,7 +288,7 @@ static void tcp_nip_connect_init(struct sock *sk)
 	tp->rcv_nxt = 0;
 	tp->rcv_wup = tp->rcv_nxt;
 	tp->copied_seq = tp->rcv_nxt;
-	inet_csk(sk)->icsk_rto = g_nip_rto == 0 ? TCP_TIMEOUT_INIT : (HZ / g_nip_rto);
+	inet_csk(sk)->icsk_rto = get_nip_rto() == 0 ? TCP_TIMEOUT_INIT : (HZ / get_nip_rto());
 	inet_csk(sk)->icsk_retransmits = 0;
 	tcp_clear_retrans(tp);
 }
@@ -311,8 +309,8 @@ static void tcp_nip_init_nondata_skb(struct sk_buff *skb, u32 seq, u8 flags)
 	TCP_SKB_CB(skb)->end_seq = seq;
 }
 
-#define OPTION_TS		BIT(1)
-#define OPTION_WSCALE		BIT(3)
+#define OPTION_TS     BIT(1)
+#define OPTION_WSCALE BIT(3)
 
 static void tcp_nip_connect_queue_skb(struct sock *sk, struct sk_buff *skb)
 {
@@ -395,12 +393,12 @@ static unsigned int tcp_nip_established_options(struct sock *sk, struct sk_buff 
 }
 
 /* Function
- *	Put the parameters from the TCP option into SKB.
- *	Write previously computed TCP options to the packet.
+ *    Put the parameters from the TCP option into SKB.
+ *    Write previously computed TCP options to the packet.
  * Parameter
- *	ptr: pointer to TCP options in SKB.
- *	tp: transmission control block.
- *	opts: structure to be sent to temporarily load TCP options.
+ *    ptr: pointer to TCP options in SKB.
+ *    tp: transmission control block.
+ *    opts: structure to be sent to temporarily load TCP options.
  */
 static void tcp_nip_options_write(__be32 *ptr, struct tcp_sock *tp,
 				  struct tcp_nip_out_options *opts)
@@ -496,11 +494,11 @@ static int __tcp_nip_transmit_skb(struct sock *sk, struct sk_buff *skb,
 	refcount_add(skb->truesize, &sk->sk_wmem_alloc);
 
 	/* Build TCP header and checksum it. */
-	th = (struct tcphdr *)skb->data;
-	th->source		= inet->inet_sport;
-	th->dest		= inet->inet_dport;
-	th->seq			= htonl(tcb->seq);
-	th->ack_seq		= htonl(rcv_nxt);
+	th          = (struct tcphdr *)skb->data;
+	th->source  = inet->inet_sport;
+	th->dest    = inet->inet_dport;
+	th->seq     = htonl(tcb->seq);
+	th->ack_seq = htonl(rcv_nxt);
 	/* TCP's header offset is measured in 4 bytes, so moving two to the right
 	 * means dividing by 4. In addition, according to the position of the offset
 	 * field in the packet, the offset field is at the beginning of a short type,
@@ -546,11 +544,11 @@ static int __tcp_nip_transmit_skb(struct sock *sk, struct sk_buff *skb,
 }
 
 /* Function
- *	TCP's transport layer sends code that builds and initializes the TCP header
- *	Construct the SK_buff call transport layer to network layer interface
+ *    TCP's transport layer sends code that builds and initializes the TCP header
+ *    Construct the SK_buff call transport layer to network layer interface
  * Parameter
- *	sk: Transmission control block.
- *	skb: Structure stores all information about network datagrams
+ *    sk: Transmission control block.
+ *    skb: Structure stores all information about network datagrams
  */
 int tcp_nip_transmit_skb(struct sock *sk, struct sk_buff *skb, int clone_it,
 			 gfp_t gfp_mask)
@@ -571,9 +569,9 @@ static void tcp_nip_queue_skb(struct sock *sk, struct sk_buff *skb)
 }
 
 /* Function
- *	A function used by the client transport layer to connect requests.
+ *    A function used by the client transport layer to connect requests.
  * Parameter
- *	sk: transmission control block.
+ *    sk: transmission control block.
  */
 int __tcp_nip_connect(struct sock *sk)
 {
@@ -663,15 +661,15 @@ unsigned int tcp_nip_current_mss(struct sock *sk)
 }
 
 /* Function:
- *	Set up TCP options for SYN-ACKs.
- *	Initializes the TCP option for the SYN-ACK segment. Returns the SIZE of the TCP header.
+ *    Set up TCP options for SYN-ACKs.
+ *    Initializes the TCP option for the SYN-ACK segment. Returns the SIZE of the TCP header.
  * Parameter
- *	req: Request connection control block.
- *	mss: maximum segment length.
- *	skb: Transfer control block buffer.
- *	opts: stores the options contained in TCP packets when they are sent.
- *	foc: Fast Open option.
- *	synack_type: type of SYN+ACK segment.
+ *    req: Request connection control block.
+ *    mss: maximum segment length.
+ *    skb: Transfer control block buffer.
+ *    opts: stores the options contained in TCP packets when they are sent.
+ *    foc: Fast Open option.
+ *    synack_type: type of SYN+ACK segment.
  */
 static unsigned int tcp_nip_synack_options(struct request_sock *req,
 					   unsigned int mss, struct sk_buff *skb,
@@ -725,14 +723,14 @@ static int get_nip_mss(const struct sock *sk, struct dst_entry *dst, struct requ
 }
 
 /* Function
- *	The SYN + ACK segment is constructed based on the current transport control block,
- *	routing information, and request information.
+ *    The SYN + ACK segment is constructed based on the current transport control block,
+ *    routing information, and request information.
  * Parameter
- *	sk: transmission control block.
- *	dst: routing.
- *	req: Request connection control block.
- *	foc: Fast Open option.
- *	synack_type: type of SYN+ACK segment.
+ *    sk: transmission control block.
+ *    dst: routing.
+ *    req: Request connection control block.
+ *    foc: Fast Open option.
+ *    synack_type: type of SYN+ACK segment.
  */
 struct sk_buff *tcp_nip_make_synack(const struct sock *sk, struct dst_entry *dst,
 				    struct request_sock *req,
@@ -815,10 +813,10 @@ struct sk_buff *tcp_nip_make_synack(const struct sock *sk, struct dst_entry *dst
 }
 
 /* Function
- *	Send SKB packets with SYN+ACK segments to the network layer.
+ *    Send SKB packets with SYN+ACK segments to the network layer.
  * Parameter
- *	req: Request connection control block.
- *	skb: Transfer control block buffer.
+ *    req: Request connection control block.
+ *    skb: Transfer control block buffer.
  */
 int __nip_send_synack(struct request_sock *req, struct sk_buff *skb)
 {
@@ -867,11 +865,11 @@ int nip_send_synack(struct request_sock *req, struct sk_buff *skb)
 }
 
 /* Function:
- *	Creates a subtransport block to complete the establishment of the three-way handshake
+ *    Creates a subtransport block to complete the establishment of the three-way handshake
  * Parameter：
- *	parent: indicates the parent transmission control block
- *	child: indicates the child transmission control block
- *	skb: Transfer control block buffer
+ *    parent: indicates the parent transmission control block
+ *    child: indicates the child transmission control block
+ *    skb: Transfer control block buffer
  */
 int tcp_nip_child_process(struct sock *parent, struct sock *child,
 			  struct sk_buff *skb)
@@ -906,10 +904,10 @@ static inline __u32 tcp_nip_acceptable_seq(const struct sock *sk)
 }
 
 /* Function:
- *	The client sends an ACK
+ *    The client sends an ACK
  * Parameter：
- *	sk: transmission control block
- *	rcv_nxt: serial number to be accepted
+ *    sk: transmission control block
+ *    rcv_nxt: serial number to be accepted
  */
 void __tcp_nip_send_ack(struct sock *sk, u32 rcv_nxt)
 {
@@ -940,7 +938,8 @@ void tcp_nip_send_ack(struct sock *sk)
 
 void tcp_nip_send_fin(struct sock *sk)
 {
-	struct sk_buff *skb, *tskb = tcp_write_queue_tail(sk);
+	struct sk_buff *skb;
+	struct sk_buff *tskb = tcp_write_queue_tail(sk);
 	struct tcp_sock *tp = tcp_sk(sk);
 	u32 cur_mss;
 
@@ -1033,7 +1032,7 @@ static bool tcp_nip_write_xmit(struct sock *sk, unsigned int mss_now, int nonagl
 	struct tcp_sock *tp = tcp_sk(sk);
 	struct tcp_nip_common *ntp = &tcp_nip_sk(sk)->common;
 	struct sk_buff *skb;
-	u32 snd_num = g_nip_tcp_snd_win_enable ? (ntp->nip_ssthresh / mss_now) : 0xFFFFFFFF;
+	u32 snd_num = get_nip_tcp_snd_win_enable() ? (ntp->nip_ssthresh / mss_now) : 0xFFFFFFFF;
 	u32 last_nip_ssthresh = ntp->nip_ssthresh;
 	static const char * const str[] = {"can`t send pkt because no window",
 					   "have window to send pkt"};
@@ -1046,11 +1045,11 @@ static bool tcp_nip_write_xmit(struct sock *sk, unsigned int mss_now, int nonagl
 	if (tp->rcv_tstamp) {
 		u32 tstamp = tcp_jiffies32 - tp->rcv_tstamp;
 
-		if (tstamp >= g_ack_to_nxt_snd_tstamp) {
-			ntp->nip_ssthresh = g_ssthresh_low_min;
+		if (tstamp >= get_ack_to_nxt_snd_tstamp()) {
+			ntp->nip_ssthresh = get_ssthresh_low_min();
 			snd_num = ntp->nip_ssthresh / mss_now;
 			ssthresh_dbg("%s new snd tstamp %u >= %u, ssthresh %u to %u, snd_num=%u",
-				     __func__, tstamp, g_ack_to_nxt_snd_tstamp,
+				     __func__, tstamp, get_ack_to_nxt_snd_tstamp(),
 				     last_nip_ssthresh, ntp->nip_ssthresh, snd_num);
 		}
 	}
@@ -1085,8 +1084,7 @@ int tcp_nip_rtx_synack(const struct sock *sk, struct request_sock *req)
 	dst = af_ops->route_req(sk, NULL, req);
 	tcp_rsk(req)->txhash = net_tx_rndhash();
 
-	res = af_ops->send_synack(sk, dst, NULL, req, NULL, TCP_SYNACK_NORMAL,
-				  NULL);
+	res = af_ops->send_synack(sk, dst, NULL, req, NULL, TCP_SYNACK_NORMAL, NULL);
 
 	return res;
 }
@@ -1113,7 +1111,7 @@ int __tcp_nip_retransmit_skb(struct sock *sk, struct sk_buff *skb, int segs)
 			return -ENOMEM;
 	}
 
-	cur_mss = tcp_nip_current_mss(sk); // TCP_BASE_MSS
+	cur_mss = tcp_nip_current_mss(sk);
 
 	if (!before(TCP_SKB_CB(skb)->seq, tcp_wnd_end(tp)) &&
 	    TCP_SKB_CB(skb)->seq != tp->snd_una)
@@ -1121,8 +1119,7 @@ int __tcp_nip_retransmit_skb(struct sock *sk, struct sk_buff *skb, int segs)
 
 	len = cur_mss * segs;
 	if (skb->len > len) {
-		if (tcp_fragment(sk, TCP_FRAG_IN_WRITE_QUEUE,
-				 skb, len, cur_mss, GFP_ATOMIC))
+		if (tcp_fragment(sk, TCP_FRAG_IN_WRITE_QUEUE, skb, len, cur_mss, GFP_ATOMIC))
 			return -ENOMEM; /* We'll try again later. */
 	} else {
 		int diff = tcp_skb_pcount(skb);
@@ -1161,9 +1158,9 @@ int tcp_nip_retransmit_skb(struct sock *sk, struct sk_buff *skb, int segs)
 	return err;
 }
 
-#define TCP_NIP_DEFERRED_ALL ((1UL << TCP_TSQ_DEFERRED) |		\
-			  (1UL << TCP_NIP_WRITE_TIMER_DEFERRED) |	\
-			  (1UL << TCP_NIP_DELACK_TIMER_DEFERRED) |	\
+#define TCP_NIP_DEFERRED_ALL ((1UL << TCP_TSQ_DEFERRED)  | \
+			  (1UL << TCP_NIP_WRITE_TIMER_DEFERRED)      | \
+			  (1UL << TCP_NIP_DELACK_TIMER_DEFERRED)     | \
 			  (1UL << TCP_MTU_REDUCED_DEFERRED))
 
 void tcp_nip_release_cb(struct sock *sk)

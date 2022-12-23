@@ -13,7 +13,7 @@
 #include <linux/tcp.h>
 #include <linux/spinlock.h>
 
-#define ETH_P_NEWIP	0xEADD		/* NIP */
+#define ETH_P_NEWIP  0xEADD  /* NIP */
 
 /* struct sock_common __sk_common */
 #define sk_nip_daddr     __sk_common.nip_daddr

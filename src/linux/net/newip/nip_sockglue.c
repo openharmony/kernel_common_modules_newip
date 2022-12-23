@@ -54,7 +54,8 @@ static int do_nip_setsockopt(struct sock *sk, int level, int optname,
 			     sockptr_t optval, unsigned int optlen)
 {
 	struct inet_sock *inet = inet_sk(sk);
-	int val = 0, err = 0;
+	int val = 0;
+	int err = 0;
 	bool needs_rtnl = nip_setsockopt_needs_rtnl(optname);
 
 	if (optlen >= sizeof(int)) {

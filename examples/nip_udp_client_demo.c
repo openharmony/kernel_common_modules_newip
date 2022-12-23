@@ -44,58 +44,72 @@
 #include "nip_lib.h"
 #include "newip_route.h"
 
+int _sendto(int cfd, struct sockaddr_nin *si_server, int pkt_num)
+{
+	char buf[BUFLEN] = {0};
+	struct timeval sys_time;
+	socklen_t slen = sizeof(struct sockaddr_nin);
+
+	gettimeofday(&sys_time, NULL);
+	sprintf(buf, "%ld %6ld NIP_UDP # %6d", sys_time.tv_sec, sys_time.tv_usec, pkt_num);
+
+	if (sendto(cfd, buf, BUFLEN, 0, (struct sockaddr *)si_server, slen) < 0) {
+		printf("client sendto fail, pkt_num=%d", pkt_num);
+		return -1;
+	}
+
+	return 0;
+}
+
+int _recvfrom(int cfd, struct sockaddr_nin *si_server, int pkt_num, int *success)
+{
+	char buf[BUFLEN] = {0};
+	fd_set readfds;
+	int tmp;
+	struct timeval tv;
+	socklen_t slen = sizeof(struct sockaddr_nin);
+
+	FD_ZERO(&readfds);
+	FD_SET(cfd, &readfds);
+	tv.tv_sec = 2;
+	tv.tv_usec = 0;
+	if (select(cfd + 1, &readfds, NULL, NULL, &tv) < 0) {
+		printf("client select fail, pkt_num=%d", pkt_num);
+		return -1;
+	}
+
+	if (FD_ISSET(cfd, &readfds)) {
+		int ret;
+		int no = 0;
+
+		ret = recvfrom(cfd, buf, BUFLEN, 0, (struct sockaddr *)si_server, &slen);
+		if (ret > 0) {
+			*success += 1;
+			ret = sscanf(buf, "%d %d NIP_UDP # %d", &tmp, &tmp, &no);
+			printf("Received --%s sock %d success:%6d/%6d/no=%6d\n",
+				   buf, cfd, *success, pkt_num + 1, no);
+		} else {
+			printf("client recvfrom fail, ret=%d\n", ret);
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
 void *send_recv(void *args)
 {
-	char buf[BUFLEN];
-	int cfd, ret;
-	fd_set readfds;
 	int success = 0;
-	int count = 0;
-	int no = 0;
-	int sendtime_sec, sendtime_usec;
-	struct timeval tv;
-	struct timeval stTime;
-	struct thread_args *th_args = (struct thread_args *)args;
-	struct sockaddr_nin si_server = th_args->si_server;
+	int cfd = ((struct thread_args *)args)->cfd;
+	struct sockaddr_nin si_server = ((struct thread_args *)args)->si_server;
 
-	cfd = th_args->cfd;
-	while (count < PKTCNT) {
-		socklen_t slen = sizeof(si_server);
-
-		memset(buf, 0, BUFLEN);
-		gettimeofday(&stTime, NULL);
-		sprintf(buf, "%ld %6ld NIP_UDP # %6d", stTime.tv_sec, stTime.tv_usec, count);
-
-		if (sendto(cfd, buf, BUFLEN, 0, (struct sockaddr *)&si_server, slen) < 0) {
-			perror("sendto");
+	for (int i = 0; i < PKTCNT; i++) {
+		if (_sendto(cfd, &si_server, i) != 0)
 			goto END;
-		}
 
-		FD_ZERO(&readfds);
-		FD_SET(cfd, &readfds);
-		tv.tv_sec = 2;
-		tv.tv_usec = 0;
-		if (select(cfd + 1, &readfds, NULL, NULL, &tv) < 0) {
-			perror("select");
+		if (_recvfrom(cfd, &si_server, i, &success) != 0)
 			goto END;
-		}
 
-		if (FD_ISSET(cfd, &readfds)) {
-			memset(buf, 0, BUFLEN);
-			ret = recvfrom(cfd, buf, BUFLEN, 0, (struct sockaddr *)&si_server, &slen);
-			if (ret > 0) {
-				success += 1;
-				(void)gettimeofday(&stTime, NULL);
-				ret = sscanf(buf, "%d %d NIP_UDP # %d", &sendtime_sec,
-					     &sendtime_usec, &no);
-				printf("Received --%s sock %d success:%6d/%6d/no=%6d\n",
-					   buf, cfd, success, count + 1, no);
-			} else {
-				printf("recv fail, ret=%d\n", ret);
-				goto END;
-			}
-		}
-		count += 1;
 		usleep(SLEEP_US);
 	}
 

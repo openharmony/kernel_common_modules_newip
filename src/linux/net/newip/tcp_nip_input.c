@@ -25,35 +25,35 @@
 #include <linux/errqueue.h>
 #include "tcp_nip_parameter.h"
 
-#define FLAG_DATA		0x01 /* Incoming frame contained data.		*/
-#define FLAG_WIN_UPDATE		0x02 /* Incoming ACK was a window update.	*/
-#define FLAG_DATA_ACKED		0x04 /* This ACK acknowledged new data.		*/
-#define FLAG_RETRANS_DATA_ACKED	0x08 /* some of which was retransmitted.	*/
-#define FLAG_SYN_ACKED		0x10 /* This ACK acknowledged SYN.		*/
-#define FLAG_DATA_SACKED	0x20 /* New SACK.				*/
-#define FLAG_ECE		0x40 /* ECE in this ACK				*/
-#define FLAG_LOST_RETRANS	0x80 /* This ACK marks some retransmission lost */
-#define FLAG_SLOWPATH		0x100 /* Do not skip RFC checks for window update.*/
-#define FLAG_ORIG_SACK_ACKED	0x200 /* Never retransmitted data are (s)acked	*/
-#define FLAG_SND_UNA_ADVANCED	0x400 /* Snd_una was changed (!= FLAG_DATA_ACKED) */
-#define FLAG_DSACKING_ACK	0x800 /* SACK blocks contained D-SACK info */
-#define FLAG_SACK_RENEGING	0x2000 /* snd_una advanced to a sacked seq */
-#define FLAG_UPDATE_TS_RECENT	0x4000 /* tcp_replace_ts_recent() */
-#define FLAG_NO_CHALLENGE_ACK	0x8000 /* do not call tcp_send_challenge_ack()	*/
+#define FLAG_DATA               0x01   /* Incoming frame contained data.           */
+#define FLAG_WIN_UPDATE         0x02   /* Incoming ACK was a window update.        */
+#define FLAG_DATA_ACKED         0x04   /* This ACK acknowledged new data.          */
+#define FLAG_RETRANS_DATA_ACKED 0x08   /* some of which was retransmitted.         */
+#define FLAG_SYN_ACKED          0x10   /* This ACK acknowledged SYN.               */
+#define FLAG_DATA_SACKED        0x20   /* New SACK.                                */
+#define FLAG_ECE                0x40   /* ECE in this ACK                          */
+#define FLAG_LOST_RETRANS       0x80   /* This ACK marks some retransmission lost  */
+#define FLAG_SLOWPATH           0x100  /* Do not skip RFC checks for window update.*/
+#define FLAG_ORIG_SACK_ACKED    0x200  /* Never retransmitted data are (s)acked    */
+#define FLAG_SND_UNA_ADVANCED   0x400  /* Snd_una was changed (!= FLAG_DATA_ACKED) */
+#define FLAG_DSACKING_ACK       0x800  /* SACK blocks contained D-SACK info        */
+#define FLAG_SACK_RENEGING      0x2000 /* snd_una advanced to a sacked seq         */
+#define FLAG_UPDATE_TS_RECENT   0x4000 /* tcp_replace_ts_recent()                  */
+#define FLAG_NO_CHALLENGE_ACK   0x8000 /* do not call tcp_send_challenge_ack()     */
 
-#define FLAG_ACKED		(FLAG_DATA_ACKED | FLAG_SYN_ACKED)
-#define FLAG_NOT_DUP		(FLAG_DATA | FLAG_WIN_UPDATE | FLAG_ACKED)
-#define FLAG_CA_ALERT		(FLAG_DATA_SACKED | FLAG_ECE)
-#define FLAG_FORWARD_PROGRESS	(FLAG_ACKED | FLAG_DATA_SACKED)
+#define FLAG_ACKED            (FLAG_DATA_ACKED | FLAG_SYN_ACKED)
+#define FLAG_NOT_DUP          (FLAG_DATA | FLAG_WIN_UPDATE | FLAG_ACKED)
+#define FLAG_CA_ALERT         (FLAG_DATA_SACKED | FLAG_ECE)
+#define FLAG_FORWARD_PROGRESS (FLAG_ACKED | FLAG_DATA_SACKED)
 
 #define TCP_REMNANT (TCP_FLAG_FIN | TCP_FLAG_URG | TCP_FLAG_SYN | TCP_FLAG_PSH)
 #define TCP_HP_BITS (~(TCP_RESERVED_BITS | TCP_FLAG_PSH))
 
-#define REXMIT_NONE	0 /* no loss recovery to do */
-#define REXMIT_LOST	1 /* retransmit packets marked lost */
-#define REXMIT_NEW	2 /* FRTO-style transmit of unsent/new packets */
+#define REXMIT_NONE 0 /* no loss recovery to do */
+#define REXMIT_LOST 1 /* retransmit packets marked lost */
+#define REXMIT_NEW  2 /* FRTO-style transmit of unsent/new packets */
 
-#define TCP_MAX_MSS		1460
+#define TCP_MAX_MSS 1460
 
 void tcp_nip_fin(struct sock *sk)
 {
@@ -315,8 +315,7 @@ static void tcp_nip_check_space(struct sock *sk)
 {
 	/* Invoke memory barrier (annotated prior to checkpatch requirements) */
 	smp_mb();
-	if (sk->sk_socket &&
-	    test_bit(SOCK_NOSPACE, &sk->sk_socket->flags))
+	if (sk->sk_socket && test_bit(SOCK_NOSPACE, &sk->sk_socket->flags))
 		tcp_nip_new_space(sk);
 }
 
@@ -330,7 +329,7 @@ static inline void tcp_nip_data_snd_check(struct sock *sk)
 void tcp_nip_send_delayed_ack(struct sock *sk)
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
-	int ato = TCP_NIP_DELACK_MIN; // rtt
+	int ato = TCP_NIP_DELACK_MIN;
 	unsigned long timeout;
 
 	icsk->icsk_ack.ato = TCP_DELACK_MIN;
@@ -364,7 +363,7 @@ static void __tcp_nip_ack_snd_check(struct sock *sk, int ofo_possible)
 	inet_csk(sk)->icsk_ack.rcv_mss = tcp_nip_current_mss(sk); // TCP_BASE_MSS
 
 	/* More than n full frame received... */
-	if (((tp->rcv_nxt - tp->rcv_wup) > g_ack_num * inet_csk(sk)->icsk_ack.rcv_mss &&
+	if (((tp->rcv_nxt - tp->rcv_wup) > get_ack_num() * inet_csk(sk)->icsk_ack.rcv_mss &&
 	     __nip_tcp_select_window(sk) >= tp->rcv_wnd) ||
 	    /* We have out of order data. */
 	    (ofo_possible && tp->nip_out_of_order_queue)) {
@@ -375,9 +374,9 @@ static void __tcp_nip_ack_snd_check(struct sock *sk, int ofo_possible)
 				ntp->dup_ack_cnt = 0;
 				ntp->last_rcv_nxt = tp->rcv_nxt;
 			}
-			if (ntp->dup_ack_cnt < g_dup_ack_snd_max)
+			if (ntp->dup_ack_cnt < get_dup_ack_snd_max())
 				tcp_nip_send_ack(sk);
-			else if (ntp->dup_ack_cnt % g_dup_ack_snd_max == 0)
+			else if (ntp->dup_ack_cnt % get_dup_ack_snd_max() == 0)
 				tcp_nip_send_ack(sk);
 		} else {
 			tcp_nip_send_ack(sk);
@@ -456,21 +455,21 @@ static int tcp_nip_clean_rtx_queue(struct sock *sk, ktime_t *skb_snd_tstamp)
 		sk_wmem_free_skb(sk, skb);
 	}
 
-	icsk->icsk_rto = (unsigned int)(HZ / g_nip_rto);
+	icsk->icsk_rto = (unsigned int)(HZ / get_nip_rto());
 	if (flag & FLAG_ACKED)
 		tcp_nip_rearm_rto(sk);
 	return 0;
 }
 
 /* Function
- *	Allocate a connection request block that holds connection request information.
- *	At the same time, initialize the set of operations used to send ACK/RST segments
- *	during connection, so that these interfaces can be easily called during establishment.
- *	Set the socket state to TCP_NEW_SYN_RECV
+ *    Allocate a connection request block that holds connection request information.
+ *    At the same time, initialize the set of operations used to send ACK/RST segments
+ *    during connection, so that these interfaces can be easily called during establishment.
+ *    Set the socket state to TCP_NEW_SYN_RECV
  * Parameter
- *	ops: Request the functional interface of the control block
- *	sk_listener: Transmission control block
- *	attach_listener: Whether to set cookies
+ *    ops: Request the functional interface of the control block
+ *    sk_listener: Transmission control block
+ *    attach_listener: Whether to set cookies
  */
 struct request_sock *ninet_reqsk_alloc(const struct request_sock_ops *ops,
 				       struct sock *sk_listener,
@@ -519,13 +518,13 @@ void tcp_nip_parse_mss(struct tcp_options_received *opt_rx,
 }
 
 /* Function
- *	Look for tcp options. Normally only called on SYN and SYNACK packets.
- *	Parsing of TCP options in SKB
+ *    Look for tcp options. Normally only called on SYN and SYNACK packets.
+ *    Parsing of TCP options in SKB
  * Parameter
- *	skb: Transfer control block buffer
- *	opt_rx: Saves the structure for TCP options
- *	estab: WANTCOOKIE
- *	foc: Len field
+ *    skb: Transfer control block buffer
+ *    opt_rx: Saves the structure for TCP options
+ *    estab: WANTCOOKIE
+ *    foc: Len field
  */
 void tcp_nip_parse_options(const struct sk_buff *skb,
 			   struct tcp_options_received *opt_rx, int estab,
@@ -555,7 +554,7 @@ void tcp_nip_parse_options(const struct sk_buff *skb,
 			if (opsize < 2) /* "2 - silly options" */
 				return;
 			if (opsize > length)
-				return;	/* don't parse partial options */
+				return; /* don't parse partial options */
 			switch (opcode) {
 			case TCPOPT_MSS:
 				tcp_nip_parse_mss(opt_rx, th, ptr, opsize, estab);
@@ -575,17 +574,17 @@ static void tcp_nip_common_init(struct request_sock *req)
 	struct tcp_nip_common *ntp = &niptreq->common;
 
 	memset(ntp, 0, sizeof(*ntp));
-	ntp->nip_ssthresh = g_nip_ssthresh_default;
+	ntp->nip_ssthresh = get_nip_ssthresh_default();
 }
 
 /* Function
- *	Initializes the connection request block information based
- *	on the options and sequence number in the received SYN segment
+ *    Initializes the connection request block information based
+ *    on the options and sequence number in the received SYN segment
  * Parameter
- *	req: Request connection control block
- *	rx_opt: Saves the structure for TCP options
- *	skb: Transfer control block buffer.
- *	sk: transmission control block.
+ *    req: Request connection control block
+ *    rx_opt: Saves the structure for TCP options
+ *    skb: Transfer control block buffer.
+ *    sk: transmission control block.
  */
 static void tcp_nip_openreq_init(struct request_sock *req,
 				 const struct tcp_options_received *rx_opt,
@@ -605,10 +604,10 @@ static void tcp_nip_openreq_init(struct request_sock *req,
 	ireq->tstamp_ok = rx_opt->tstamp_ok;
 	ireq->snd_wscale = rx_opt->snd_wscale;
 
-	if (g_wscale_enable == 1) {
+	if (get_wscale_enable()) {
 		ireq->wscale_ok = 1;
-		ireq->snd_wscale = g_wscale; // rx_opt->snd_wscale;
-		ireq->rcv_wscale = g_wscale;
+		ireq->snd_wscale = get_wscale(); // rx_opt->snd_wscale;
+		ireq->rcv_wscale = get_wscale();
 	}
 
 	ireq->acked = 0;
@@ -619,12 +618,12 @@ static void tcp_nip_openreq_init(struct request_sock *req,
 }
 
 /* Function
- *	Based on listening SOCK and REQ, create a transport control block
- *	for the new connection and initialize it.
+ *    Based on listening SOCK and REQ, create a transport control block
+ *    for the new connection and initialize it.
  * Parameter
- *	sk: the listening transmission control block.
- *	req: Request connection control block
- *	skb: Transfer control block buffer.
+ *    sk: the listening transmission control block.
+ *    req: Request connection control block
+ *    skb: Transfer control block buffer.
  */
 struct sock *tcp_nip_create_openreq_child(const struct sock *sk,
 					  struct request_sock *req,
@@ -664,7 +663,7 @@ struct sock *tcp_nip_create_openreq_child(const struct sock *sk,
 
 		/* Initialization of delay-related variables */
 		minmax_reset(&newtp->rtt_min, tcp_jiffies32, ~0U);
-		newicsk->icsk_rto = g_nip_rto == 0 ? TCP_TIMEOUT_INIT : (HZ / g_nip_rto);
+		newicsk->icsk_rto = get_nip_rto() == 0 ? TCP_TIMEOUT_INIT : (HZ / get_nip_rto());
 		newicsk->icsk_ack.lrcvtime = tcp_jiffies32;
 
 		/* The congestion control-related variables are initialized */
@@ -766,16 +765,16 @@ void tcp_nip_openreq_init_rwin(struct request_sock *req,
 				  0,
 				  &rcv_wscale,
 				  0);
-	ireq->rcv_wscale = g_wscale_enable == 1 ? g_wscale : rcv_wscale;
+	ireq->rcv_wscale = get_wscale_enable() ? get_wscale() : rcv_wscale;
 }
 
 /* Function
- *	A function used by the server to process client connection requests.
+ *    A function used by the server to process client connection requests.
  * Parameter
- *	rsk_ops: Functional interface to request control blocks.
- *	af_ops: The functional interface of the TCP request block.
- *	sk: transmission control block.
- *	skb: Transfer control block buffer.
+ *    rsk_ops: Functional interface to request control blocks.
+ *    af_ops: The functional interface of the TCP request block.
+ *    sk: transmission control block.
+ *    skb: Transfer control block buffer.
  */
 int _tcp_nip_conn_request(struct request_sock_ops *rsk_ops,
 			  const struct tcp_request_sock_ops *af_ops,
@@ -913,7 +912,7 @@ static void tcp_nip_ack_update_window(struct sock *sk, const struct sk_buff *skb
 }
 
 /* Check whether the ACK returned by the packet is detected
- *and whether the peer window is opened
+ * and whether the peer window is opened
  */
 static void tcp_nip_ack_probe(struct sock *sk)
 {
@@ -1026,7 +1025,7 @@ static void tcp_nip_dup_ack_retrans(struct sock *sk, const struct sk_buff *skb,
 			ntp->ack_retrans_seq = ack;
 			ntp->ack_retrans_num = 0;
 
-			ntp->nip_ssthresh = g_ssthresh_low;
+			ntp->nip_ssthresh = get_ssthresh_low();
 			ssthresh_dbg("%s new dup ack, win %u to %u, discard_num=%u, seq=%u~%u",
 				     __func__, last_nip_ssthresh, ntp->nip_ssthresh, discard_num,
 				     tp->selective_acks[0].start_seq,
@@ -1069,60 +1068,62 @@ static void tcp_nip_ack_calc_ssthresh(struct sock *sk, u32 ack, int icsk_rto_las
 	struct tcp_sock *tp = tcp_sk(sk);
 	struct tcp_nip_common *ntp = &tcp_nip_sk(sk)->common;
 	struct inet_connection_sock *icsk = inet_csk(sk);
-	int ack_reset = ack / g_nip_ssthresh_reset;
+	int ack_reset = ack / get_nip_ssthresh_reset();
 	u32 nip_ssthresh;
 
 	if (ntp->nip_ssthresh_reset != ack_reset) {
 		ssthresh_dbg("%s ack reset win %u to %u, ack=%u",
-			     __func__, ntp->nip_ssthresh, g_ssthresh_low, ack);
+			     __func__, ntp->nip_ssthresh, get_ssthresh_low(), ack);
 		ntp->nip_ssthresh_reset = ack_reset;
-		ntp->nip_ssthresh = g_ssthresh_low;
+		ntp->nip_ssthresh = get_ssthresh_low();
 	} else {
 		if (skb_snd_tstamp) {
 			u32 rtt_tstamp = tp->rcv_tstamp - skb_snd_tstamp;
 
-			if (rtt_tstamp >= g_rtt_tstamp_rto_up) {
+			if (rtt_tstamp >= get_rtt_tstamp_rto_up()) {
 				ssthresh_dbg("%s rtt %u >= %u, win %u to %u, rto %u to %u, ack=%u",
-					     __func__, rtt_tstamp, g_rtt_tstamp_rto_up,
-					     ntp->nip_ssthresh, g_ssthresh_low_min,
+					     __func__, rtt_tstamp, get_rtt_tstamp_rto_up(),
+					     ntp->nip_ssthresh, get_ssthresh_low_min(),
 					     icsk_rto_last, icsk->icsk_rto, ack);
 
-				ntp->nip_ssthresh = g_ssthresh_low_min;
-			} else if (rtt_tstamp >= g_rtt_tstamp_high) {
+				ntp->nip_ssthresh = get_ssthresh_low_min();
+			} else if (rtt_tstamp >= get_rtt_tstamp_high()) {
 				ssthresh_dbg("%s rtt %u >= %u, win %u to %u, ack=%u",
-					     __func__, rtt_tstamp, g_rtt_tstamp_high,
-					     ntp->nip_ssthresh, g_ssthresh_low, ack);
+					     __func__, rtt_tstamp, get_rtt_tstamp_high(),
+					     ntp->nip_ssthresh, get_ssthresh_low(), ack);
 
-				ntp->nip_ssthresh = g_ssthresh_low;
-			} else if (rtt_tstamp >= g_rtt_tstamp_mid_high) {
+				ntp->nip_ssthresh = get_ssthresh_low();
+			} else if (rtt_tstamp >= get_rtt_tstamp_mid_high()) {
 				ssthresh_dbg("%s rtt %u >= %u, win %u to %u, ack=%u",
-					     __func__, rtt_tstamp, g_rtt_tstamp_mid_high,
-					     ntp->nip_ssthresh, g_ssthresh_mid_low, ack);
+					     __func__, rtt_tstamp, get_rtt_tstamp_mid_high(),
+					     ntp->nip_ssthresh, get_ssthresh_mid_low(), ack);
 
-				ntp->nip_ssthresh = g_ssthresh_mid_low;
-			} else if (rtt_tstamp >= g_rtt_tstamp_mid_low) {
-				u32 rtt_tstamp_scale = g_rtt_tstamp_mid_high - rtt_tstamp;
-				int half_mid_high = g_ssthresh_mid_high / 2;
+				ntp->nip_ssthresh = get_ssthresh_mid_low();
+			} else if (rtt_tstamp >= get_rtt_tstamp_mid_low()) {
+				u32 rtt_tstamp_scale = get_rtt_tstamp_mid_high() - rtt_tstamp;
+				int half_mid_high = get_ssthresh_mid_high() / 2;
 
 				nip_ssthresh = half_mid_high + rtt_tstamp_scale * half_mid_high /
-					       (g_rtt_tstamp_mid_high - g_rtt_tstamp_mid_low);
+					       (get_rtt_tstamp_mid_high() -
+					       get_rtt_tstamp_mid_low());
 
-				ntp->nip_ssthresh = ntp->nip_ssthresh > g_ssthresh_mid_high ?
+				ntp->nip_ssthresh = ntp->nip_ssthresh > get_ssthresh_mid_high() ?
 						    half_mid_high : ntp->nip_ssthresh;
-				nip_ssthresh = (ntp->nip_ssthresh * g_ssthresh_high_step +
-						      nip_ssthresh) / (g_ssthresh_high_step + 1);
+				nip_ssthresh = (ntp->nip_ssthresh * get_ssthresh_high_step() +
+					       nip_ssthresh) / (get_ssthresh_high_step() + 1);
 
 				ssthresh_dbg("%s rtt %u >= %u, win %u to %u, ack=%u",
-					     __func__, rtt_tstamp, g_rtt_tstamp_mid_low,
+					     __func__, rtt_tstamp, get_rtt_tstamp_mid_low(),
 					     ntp->nip_ssthresh, nip_ssthresh, ack);
 
 				ntp->nip_ssthresh = nip_ssthresh;
 			} else if (rtt_tstamp != 0) {
-				nip_ssthresh = (ntp->nip_ssthresh * g_ssthresh_high_step +
-						      g_ssthresh_high) / (g_ssthresh_high_step + 1);
+				nip_ssthresh = (ntp->nip_ssthresh * get_ssthresh_high_step() +
+					       get_ssthresh_high()) /
+					       (get_ssthresh_high_step() + 1);
 
 				ssthresh_dbg("%s rtt %u < %u, win %u to %u, ack=%u",
-					     __func__, rtt_tstamp, g_rtt_tstamp_mid_low,
+					     __func__, rtt_tstamp, get_rtt_tstamp_mid_low(),
 					     ntp->nip_ssthresh, nip_ssthresh, ack);
 
 				ntp->nip_ssthresh =  nip_ssthresh;
@@ -1173,12 +1174,12 @@ static int tcp_nip_ack(struct sock *sk, const struct sk_buff *skb)
 		tcp_nip_clean_rtx_queue(sk, &skb_snd_tstamp);
 
 		tcp_nip_ack_calc_ssthresh(sk, ack, icsk_rto_last, skb_snd_tstamp);
-		tcp_nip_nor_ack_retrans(sk, ack, g_ack_retrans_num);
+		tcp_nip_nor_ack_retrans(sk, ack, get_ack_retrans_num());
 		return 1;
 	}
 
 	// dup ack: ack == tp->snd_una
-	tcp_nip_dup_ack_retrans(sk, skb, ack, g_dup_ack_retrans_num);
+	tcp_nip_dup_ack_retrans(sk, skb, ack, get_dup_ack_retrans_num());
 
 	return 1;
 }
@@ -1384,11 +1385,11 @@ void tcp_nip_finish_connect(struct sock *sk, struct sk_buff *skb)
 }
 
 /* Function:
- *	A function that handles the second handshake
+ *    A function that handles the second handshake
  * Parameter：
- *	sk: transmission control block
- *	skb: Transfer control block buffer
- *	Th: TCP header field
+ *    sk: transmission control block
+ *    skb: Transfer control block buffer
+ *    Th: TCP header field
  */
 static int tcp_nip_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 					     const struct tcphdr *th)
@@ -1410,7 +1411,7 @@ static int tcp_nip_rcv_synsent_state_process(struct sock *sk, struct sk_buff *sk
 		if (!after(TCP_SKB_CB(skb)->ack_seq, tp->snd_una) ||
 		    after(TCP_SKB_CB(skb)->ack_seq, tp->snd_nxt))
 			goto reset_and_undo;
-		/* Must be within the corresponding time*/
+		/* Must be within the corresponding time */
 		if (tp->rx_opt.saw_tstamp && tp->rx_opt.rcv_tsecr &&
 		    !between(tp->rx_opt.rcv_tsecr, tp->retrans_stamp, tcp_time_stamp(tp))) {
 			NET_INC_STATS(sock_net(sk), LINUX_MIB_PAWSACTIVEREJECTED);
@@ -1435,10 +1436,10 @@ static int tcp_nip_rcv_synsent_state_process(struct sock *sk, struct sk_buff *sk
 		tp->rcv_wup = TCP_SKB_CB(skb)->seq + 1;
 		tp->snd_wnd = ntohs(th->window);
 
-		if (g_wscale_enable == 1) {
+		if (get_wscale_enable()) {
 			tp->rx_opt.wscale_ok = 1;
-			tp->rx_opt.snd_wscale = g_wscale;
-			tp->rx_opt.rcv_wscale = g_wscale;
+			tp->rx_opt.snd_wscale = get_wscale();
+			tp->rx_opt.rcv_wscale = get_wscale();
 		}
 
 		if (!tp->rx_opt.wscale_ok) {
@@ -1493,13 +1494,13 @@ reset_and_undo:
 }
 
 /* Function:
- *	TCP processing function that is differentiated according to
- *	different states after receiving data packets
+ *    TCP processing function that is differentiated according to
+ *    different states after receiving data packets
  * Parameter：
- *	sk: transmission control block
- *	skb: Transfer control block buffer
+ *    sk: transmission control block
+ *    skb: Transfer control block buffer
  * Note: Currently this function only has code for handling the first handshake packet
- *	 Implementation of the third handshake ACK to handle the code
+ *     Implementation of the third handshake ACK to handle the code
  */
 int tcp_nip_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 {
@@ -1672,9 +1673,9 @@ discard:
 }
 
 /* Function
- *	Initialize RCV_MSS
+ *    Initialize RCV_MSS
  * Parameter
- *	sk: transmission control block
+ *    sk: transmission control block
  */
 void tcp_nip_initialize_rcv_mss(struct sock *sk)
 {
@@ -1689,17 +1690,17 @@ void tcp_nip_initialize_rcv_mss(struct sock *sk)
 }
 
 /* Function
- *	Handle the third handshake ACK and return the new control block successfully.
- *	Is the core process for handling ACKS.
- *	(1)Create a child control block. Note that the state of the child control
- *	block is TCP_SYN_RECV
- *	This is different from the TCP_NEW_SYN_RECV control block created when syn was received.
- *	(2)Remove the request control block from the incomplete connection queue
- *	and add it to the completed connection queue
+ *    Handle the third handshake ACK and return the new control block successfully.
+ *    Is the core process for handling ACKS.
+ *    (1)Create a child control block. Note that the state of the child control
+ *    block is TCP_SYN_RECV
+ *    This is different from the TCP_NEW_SYN_RECV control block created when syn was received.
+ *    (2)Remove the request control block from the incomplete connection queue
+ *    and add it to the completed connection queue
  * Parameter
- *	sk: transmission control block
- *	skb: Transfer control block buffer
- *	req: Request connection control block
+ *    sk: transmission control block
+ *    skb: Transfer control block buffer
+ *    req: Request connection control block
  */
 struct sock *tcp_nip_check_req(struct sock *sk, struct sk_buff *skb,
 			       struct request_sock *req)

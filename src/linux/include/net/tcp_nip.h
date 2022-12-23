@@ -200,4 +200,4 @@ void tcp_nip_release_cb(struct sock *sk);
 void tcp_nip_keepalive_enable(struct sock *sk);
 void tcp_nip_keepalive_disable(struct sock *sk);
 
-#endif	/* _NIP_TCP_H */
+#endif  /* _NIP_TCP_H */

@@ -45,7 +45,7 @@
  * ioctl(fd, SIOGIFINDEX, &ifr);
  * ifr.ifr_ifindex; ===> ifindex
  */
-int32_t nip_add_addr(int32_t ifindex, const unsigned char *addr, uint8_t addr_len)
+int nip_add_addr(int ifindex, const unsigned char *addr, unsigned char addr_len)
 {
 	int fd, ret;
 	struct nip_ifreq ifrn;
@@ -61,7 +61,7 @@ int32_t nip_add_addr(int32_t ifindex, const unsigned char *addr, uint8_t addr_le
 
 	ret = ioctl(fd, SIOCSIFADDR, &ifrn);
 	if (ret < 0 && errno != EEXIST) { // ignore File Exists error
-		printf("cfg newip addr fail, ifindex=%d, ret=%d.\n", ifindex, ret);
+		printf("cfg newip addr fail, ifindex=%d, ret=%d\n", ifindex, ret);
 		close(fd);
 		return -1;
 	}
@@ -75,29 +75,29 @@ int32_t nip_add_addr(int32_t ifindex, const unsigned char *addr, uint8_t addr_le
  */
 int main(int argc, char **argv)
 {
-	int ret;
 	int ifindex = 0;
-	uint8_t client_addr[INDEX_1] = {0x50};       // 1-byte address of the client: 0x50
-	uint8_t server_addr[INDEX_2] = {0xDE, 0x00}; // 2-byte address of the server: 0xDE00
-	uint8_t *addr;
-	uint8_t addr_len;
+	int ret;
+	unsigned char client_addr[INDEX_1] = {0x50};       // 1-byte address of the client: 0x50
+	unsigned char server_addr[INDEX_2] = {0xDE, 0x00}; // 2-byte address of the server: 0xDE00
+	unsigned char *addr;
+	unsigned char addr_len;
 
 	if (argc == DEMO_INPUT_1) {
 		if (!strcmp(*(argv + 1), "server")) {
-			printf("server cfg addr=0x%02x%02x.\n",
+			printf("server cfg addr=0x%02x%02x\n",
 			       server_addr[INDEX_0], server_addr[INDEX_1]);
 			addr = server_addr;
 			addr_len = sizeof(server_addr);
 		} else if (!strcmp(*(argv + 1), "client")) {
-			printf("client cfg addr=0x%x02x.\n", client_addr[INDEX_0]);
+			printf("client cfg addr=0x%02x\n", client_addr[INDEX_0]);
 			addr = client_addr;
 			addr_len = sizeof(client_addr);
 		} else {
-			printf("invalid addr cfg input.\n");
+			printf("invalid addr cfg input\n");
 			return -1;
 		}
 	} else {
-		printf("unsupport addr cfg input.\n");
+		printf("unsupport addr cfg input\n");
 		return -1;
 	}
 
@@ -109,7 +109,7 @@ int main(int argc, char **argv)
 	if (ret != 0)
 		return -1;
 
-	printf("%s %s(ifindex=%d) cfg addr success.\n", *argv, NIC_NAME, ifindex);
+	printf("%s %s(ifindex=%d) cfg addr success\n", *argv, NIC_NAME, ifindex);
 	return 0;
 }
 

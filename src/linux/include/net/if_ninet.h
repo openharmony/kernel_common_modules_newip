@@ -32,8 +32,8 @@ struct ninet_ifaddr {
 
 	__u32 flags;
 
-	unsigned long cstamp;	/* created timestamp */
-	unsigned long tstamp;	/* updated timestamp */
+	unsigned long cstamp; /* created timestamp */
+	unsigned long tstamp; /* updated timestamp */
 
 	struct ninet_dev *idev;
 	struct nip_rt_info *rt;
@@ -57,7 +57,7 @@ struct ninet_dev {
 	struct neigh_parms *nd_parms;
 	struct nip_devconf cnf;
 
-	unsigned long tstamp;	/* newip InterfaceTable update timestamp */
+	unsigned long tstamp; /* newip InterfaceTable update timestamp */
 	struct rcu_head rcu;
 };
 

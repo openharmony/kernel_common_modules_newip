@@ -31,8 +31,8 @@
 #include <net/protocol.h>
 #include <net/dst.h>
 #include <net/lwtunnel.h>
-#include <linux/uaccess.h>	/*copy_from_user()*/
-#include <linux/rtnetlink.h>	/*rtnl_lock()*/
+#include <linux/uaccess.h>   /* copy_from_user() */
+#include <linux/rtnetlink.h> /* rtnl_lock() */
 
 #include <net/nip_route.h>
 #include <net/nip_fib.h>
@@ -293,29 +293,28 @@ struct dst_entry *nip_route_output_flags(struct net *net, const struct sock *sk,
 	dst = nip_fib_rule_lookup(net, fln, flags, nip_pol_route_output);
 	rt = (struct nip_rt_info *)dst;
 
-	if (rt->rt_flags & RTF_LOCAL) {
-		rcu_read_lock();
-		if (rt->rt_idev) {
-			read_lock_bh(&rt->rt_idev->lock);
-			/* search saddr in idev->addr */
-			if (!list_empty(&rt->rt_idev->addr_list)) {
-				struct ninet_ifaddr *ifp;
+	if (!(rt->rt_flags & RTF_LOCAL))
+		return dst;
 
-				list_for_each_entry(ifp, &rt->rt_idev->addr_list, if_list) {
-					fln->saddr = ifp->addr;
-					break;
-				}
+	rcu_read_lock();
+	if (rt->rt_idev) {
+		read_lock_bh(&rt->rt_idev->lock);
+		/* search saddr in idev->addr */
+		if (!list_empty(&rt->rt_idev->addr_list)) {
+			struct ninet_ifaddr *ifp;
+
+			list_for_each_entry(ifp, &rt->rt_idev->addr_list, if_list) {
+				fln->saddr = ifp->addr;
+				break;
 			}
-			read_unlock_bh(&rt->rt_idev->lock);
 		}
-		rcu_read_unlock();
-
-		dst_release(dst);
-		dst_hold(&net->newip.nip_broadcast_entry->dst);
-		return &net->newip.nip_broadcast_entry->dst;
+		read_unlock_bh(&rt->rt_idev->lock);
 	}
+	rcu_read_unlock();
 
-	return dst;
+	dst_release(dst);
+	dst_hold(&net->newip.nip_broadcast_entry->dst);
+	return &net->newip.nip_broadcast_entry->dst;
 }
 
 struct nip_rt_info *nip_pol_route(struct net *net, struct nip_fib_table *table,

@@ -35,7 +35,8 @@
 #define NIP_CHECKSUM_UINT8_PAYLOAD 8
 unsigned int _nip_check_sum(const unsigned char *data, unsigned short data_len)
 {
-	unsigned int i = 0, sum = 0;
+	unsigned int i = 0;
+	unsigned int sum = 0;
 
 	while (i + 1 < data_len) {
 		sum += (data[i] << NIP_CHECKSUM_UINT8_PAYLOAD) + data[i + 1];
