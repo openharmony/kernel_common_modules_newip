@@ -265,7 +265,7 @@ static int ninet_addr_add(struct net *net, int ifindex,
 	if (!dev)
 		return -ENODEV;
 
-	idev = nip_addrconf_add_dev(dev);	/* 挂接dev和idev */
+	idev = nip_addrconf_add_dev(dev);
 	if (IS_ERR(idev))
 		return PTR_ERR(idev);
 
@@ -377,30 +377,39 @@ static int ninet_addr_del(struct net *net, int ifindex, u32 ifa_flags,
 	return -EADDRNOTAVAIL;
 }
 
-int nip_addrconf_add_ifaddr(struct net *net, void __user *arg)
+int nip_addrconf_ifaddr_check(struct net *net, void __user *arg, struct nip_ifreq *ireq)
 {
-	struct nip_ifreq ireq;
-
-	int err;
-
 	if (!ns_capable(net->user_ns, CAP_NET_ADMIN)) {
 		nip_dbg("%s: not admin can`t cfg", __func__);
 		return -EPERM;
 	}
 
-	if (copy_from_user(&ireq, arg, sizeof(struct nip_ifreq))) {
+	if (copy_from_user(ireq, arg, sizeof(struct nip_ifreq))) {
 		nip_dbg("%s: fail to copy cfg data", __func__);
 		return -EFAULT;
 	}
 
-	if (nip_addr_invalid(&ireq.ifrn_addr)) {
-		nip_dbg("%s: nip addr invalid, bitlen=%u", __func__, ireq.ifrn_addr.bitlen);
+	if (nip_addr_invalid(&ireq->ifrn_addr)) {
+		nip_dbg("%s: nip addr invalid, bitlen=%u", __func__, ireq->ifrn_addr.bitlen);
 		return -EFAULT;
 	}
 
-	if (nip_addr_public(&ireq.ifrn_addr)) {
+	if (nip_addr_public(&ireq->ifrn_addr)) {
 		nip_dbg("%s: The public address cannot be configured", __func__);
 		return -EFAULT;
+	}
+	return 0;
+}
+
+int nip_addrconf_add_ifaddr(struct net *net, void __user *arg)
+{
+	struct nip_ifreq ireq;
+	int err;
+
+	err = nip_addrconf_ifaddr_check(net, arg, &ireq);
+	if (err < 0) {
+		nip_dbg("%s: The ifaddr check failed", __func__);
+		return err;
 	}
 
 	rtnl_lock();
@@ -416,24 +425,10 @@ int nip_addrconf_del_ifaddr(struct net *net, void __user *arg)
 	struct nip_ifreq ireq;
 	int err;
 
-	if (!ns_capable(net->user_ns, CAP_NET_ADMIN)) {
-		nip_dbg("%s: not admin can`t cfg", __func__);
-		return -EPERM;
-	}
-
-	if (copy_from_user(&ireq, arg, sizeof(struct nip_ifreq))) {
-		nip_dbg("%s: fail to copy cfg data", __func__);
-		return -EFAULT;
-	}
-
-	if (nip_addr_invalid(&ireq.ifrn_addr)) {
-		nip_dbg("%s: nip addr invalid, bitlen=%u", __func__, ireq.ifrn_addr.bitlen);
-		return -EFAULT;
-	}
-
-	if (nip_addr_public(&ireq.ifrn_addr)) {
-		nip_dbg("%s: Public addresses cannot be deleted", __func__);
-		return -EFAULT;
+	err = nip_addrconf_ifaddr_check(net, arg, &ireq);
+	if (err < 0) {
+		nip_dbg("%s: The ifaddr check failed", __func__);
+		return err;
 	}
 
 	rtnl_lock();

@@ -46,12 +46,12 @@ void _check_nip_enable(void)
 	FILE *fn = fopen(NIP_DISABLE_PATH, "r");
 
 	if (!fn) {
-		printf("fail to open %s.\n\n", NIP_DISABLE_PATH);
+		printf("fail to open %s\n\n", NIP_DISABLE_PATH);
 		return;
 	}
 
 	if (fgets(tmp, NIP_DISABLE_LENTH, fn) == NULL) {
-		printf("fail to gets %s.\n\n", NIP_DISABLE_PATH);
+		printf("fail to gets %s\n\n", NIP_DISABLE_PATH);
 		fclose(fn);
 		return;
 	}
@@ -75,9 +75,9 @@ int main(int argc, char **argv)
 	int af_ninet = check_nip_enable();
 
 	if (af_ninet)
-		printf("Support NewIP.\n\n");
+		printf("Support NewIP\n\n");
 	else
-		printf("Not support NewIP.\n\n");
+		printf("Not support NewIP\n\n");
 	return 0;
 }
 

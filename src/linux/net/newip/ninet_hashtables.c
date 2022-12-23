@@ -36,14 +36,14 @@ static __always_inline void net_secret_init(void)
 #ifdef CONFIG_INET
 static u32 seq_scale(u32 seq)
 {
-	/*	As close as possible to RFC 793, which
-	 *	suggests using a 250 kHz clock.
-	 *	Further reading shows this assumes 2 Mb/s networks.
-	 *	For 10 Mb/s Ethernet, a 1 MHz clock is appropriate.
-	 *	For 10 Gb/s Ethernet, a 1 GHz clock should be ok, but
-	 *	we also need to limit the resolution so that the u32 seq
-	 *	overlaps less than one time per MSL (2 minutes).
-	 *	Choosing a clock of 64 ns period is OK. (period of 274 s)
+	/* As close as possible to RFC 793, which
+	 * suggests using a 250 kHz clock.
+	 * Further reading shows this assumes 2 Mb/s networks.
+	 * or 10 Mb/s Ethernet, a 1 MHz clock is appropriate.
+	 * For 10 Gb/s Ethernet, a 1 GHz clock should be ok, but
+	 * we also need to limit the resolution so that the u32 seq
+	 * overlaps less than one time per MSL (2 minutes).
+	 * Choosing a clock of 64 ns period is OK. (period of 274 s)
 	 */
 	return seq + (ktime_get_real_ns() >> 6);
 }
@@ -135,13 +135,13 @@ static void ninet_hash2(struct inet_hashinfo *h, struct sock *sk)
 }
 
 /* Function
- *	Returns the hash value based on the passed argument
+ *    Returns the hash value based on the passed argument
  * Parameter
- *	net: The namespace
- *	laddr: The destination address
- *	lport: Destination port
- *	faddr: Source address
- *	fport: Source port
+ *    net: The namespace
+ *    laddr: The destination address
+ *    lport: Destination port
+ *    faddr: Source address
+ *    fport: Source port
  */
 u32 ninet_ehashfn(const struct net *net,
 		  const struct nip_addr *laddr, const u16 lport,
@@ -164,11 +164,11 @@ u32 ninet_ehashfn(const struct net *net,
 }
 
 /* Function
- *	The socket is put into the Listen hash in case the server finds
-	the socket in the second handshake
+ *    The socket is put into the Listen hash in case the server finds
+ *    the socket in the second handshake
  * Parameter
- *	sk: Transmission control block
- *	osk: old socket
+ *    sk: Transmission control block
+ *    osk: old socket
  */
 int __ninet_hash(struct sock *sk, struct sock *osk)
 {
@@ -257,17 +257,17 @@ unlock:
 }
 
 /* Function
- *	Find transport control blocks based on address and port in the ehash table.
- *	If found, three handshakes have been made and a connection has been established,
- *	and normal communication can proceed.
+ *    Find transport control blocks based on address and port in the ehash table.
+ *    If found, three handshakes have been made and a connection has been established,
+ *    and normal communication can proceed.
  * Parameter
- *	net: The namespace
- *	hashinfo: A global scalar of type tcp_hashinfo that stores tcp_SOCK(including ESTABLISHED,
- *	          listen, and bind) for various states of the current system.
- *	saddr: Source address
- *	sport: Source port
- *	daddr: The destination address
- *	hnum: Destination port
+ *    net: The namespace
+ *    hashinfo: A global scalar of type tcp_hashinfo that stores tcp_SOCK(including ESTABLISHED,
+ *              listen, and bind) for various states of the current system.
+ *    saddr: Source address
+ *    sport: Source port
+ *    daddr: The destination address
+ *    hnum: Destination port
  */
 struct sock *__ninet_lookup_established(struct net *net,
 					struct inet_hashinfo *hashinfo,
@@ -346,8 +346,11 @@ static struct sock *ninet_lhash2_lookup(struct net *net,
 					const int dif, const int sdif)
 {
 	struct inet_connection_sock *icsk;
-	struct sock *sk, *result = NULL;
-	int hiscore = 0, matches = 0, reuseport = 0;
+	struct sock *sk;
+	struct sock *result = NULL;
+	int hiscore = 0;
+	int matches = 0;
+	int reuseport = 0;
 	u32 phash = 0;
 
 	inet_lhash2_for_each_icsk_rcu(icsk, &ilb2->head) {

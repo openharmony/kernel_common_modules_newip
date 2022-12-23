@@ -15,10 +15,10 @@
 #include <linux/netdevice.h>
 
 #define ADDRCONF_NOTIFY_PRIORITY 0
-#define NIN_ADDR_HSIZE_SHIFT	(4)
-#define NIN_ADDR_HSIZE		(1 << NIN_ADDR_HSIZE_SHIFT)
+#define NIN_ADDR_HSIZE_SHIFT     (4)
+#define NIN_ADDR_HSIZE           (1 << NIN_ADDR_HSIZE_SHIFT)
 
-#define DST_HOST		0x0001	/* NIP */
+#define DST_HOST                 0x0001 /* NIP */
 
 int nip_addrconf_add_ifaddr(struct net *net, void __user *arg);
 int nip_addrconf_del_ifaddr(struct net *net, void __user *arg);

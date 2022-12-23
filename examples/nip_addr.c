@@ -45,7 +45,7 @@
  * ioctl(fd, SIOGIFINDEX, &ifr);
  * ifr.ifr_ifindex; ===> ifindex
  */
-int32_t nip_add_addr(int32_t ifindex, const struct nip_addr *addr, int opt)
+int nip_add_addr(int ifindex, const struct nip_addr *addr, int opt)
 {
 	int fd, ret;
 	struct nip_ifreq ifrn;
@@ -76,66 +76,78 @@ void cmd_help(void)
 	printf("[cmd example] nip_addr <netcard-name> { add | del } <addr>\n");
 }
 
+int parse_name(char **argv, int *ifindex, char *dev)
+{
+	int len = strlen(*argv);
+
+	memset(dev, 0, ARRAY_LEN);
+	if (!len || len >= (ARRAY_LEN - 1))
+		return -1;
+	memcpy(dev, *argv, len);
+	dev[len + 1] = '\0';
+
+	if (strncmp(dev, NIC_NAME_CHECK, strlen(NIC_NAME_CHECK))) {
+		printf("unsupport addr cfg cmd-1, cmd=%s\n", dev);
+		cmd_help();
+		return -1;
+	}
+	return nip_get_ifindex(dev, ifindex);
+}
+
+int parse_cmd(char **argv, int *opt)
+{
+	char cmd[ARRAY_LEN];
+	int len = strlen(*argv);
+
+	memset(cmd, 0, ARRAY_LEN);
+	if (!len || len >= (ARRAY_LEN - 1))
+		return -1;
+	memcpy(cmd, *argv, len);
+	cmd[len + 1] = '\0';
+
+	if (!strncmp(cmd, CMD_ADD, strlen(CMD_ADD))) {
+		*opt = SIOCSIFADDR;
+	} else if (!strncmp(cmd, CMD_DEL, strlen(CMD_DEL))) {
+		*opt = SIOCDIFADDR;
+	} else {
+		printf("unsupport addr cfg cmd-2, cmd=%s\n", cmd);
+		cmd_help();
+		return -1;
+	}
+	return 0;
+}
+
 int main(int argc, char **argv_input)
 {
+	char dev[ARRAY_LEN];
 	int ret;
 	int opt;
-	unsigned int len;
 	int ifindex = 0;
 	char **argv = argv_input;
-	char cmd[ARRAY_LEN];
-	char dev[ARRAY_LEN];
 	struct nip_addr addr = {0};
 
 	if (argc != DEMO_INPUT_3) {
-		printf("unsupport addr cfg input, argc=%d.\n", argc);
+		printf("unsupport addr cfg input, argc=%d\n", argc);
 		cmd_help();
 		return -1;
 	}
 
 	/* 配置参数1解析: <netcard-name> */
 	argv++;
-	memset(dev, 0, ARRAY_LEN);
-
-	len = strlen(*argv);
-	if (!len || len >= (ARRAY_LEN - 1))
-		return -1;
-	memcpy(dev, *argv, len);
-	dev[len + 1] = '\0';
-
-	if (strncmp(dev, "wlan", NAME_WLAN_LEN)) {
-		printf("unsupport addr cfg cmd-1, cmd=%s.\n", dev);
-		cmd_help();
-		return -1;
-	}
-	ret = nip_get_ifindex(dev, &ifindex);
+	ret = parse_name(argv, &ifindex, dev);
 	if (ret != 0)
 		return -1;
 
 	/* 配置参数2解析: { add | del } */
 	argv++;
-	memset(cmd, 0, ARRAY_LEN);
-
-	len = strlen(*argv);
-	if (!len || len >= (ARRAY_LEN - 1))
+	ret = parse_cmd(argv, &opt);
+	if (ret != 0)
 		return -1;
-	memcpy(cmd, *argv, len);
-	cmd[len + 1] = '\0';
-
-	if (!strncmp(cmd, "add", NAME_WLAN_LEN)) {
-		opt = SIOCSIFADDR;
-	} else if (!strncmp(cmd, "del", NAME_WLAN_LEN)) {
-		opt = SIOCDIFADDR;
-	} else {
-		printf("unsupport addr cfg cmd-2, cmd=%s.\n", cmd);
-		cmd_help();
-		return -1;
-	}
 
 	/* 配置参数3解析: <addr> */
 	argv++;
 	if (nip_get_addr(argv, &addr)) {
-		printf("unsupport addr cfg cmd-3.\n");
+		printf("unsupport addr cfg cmd-3\n");
 		cmd_help();
 		return 1;
 	}
@@ -144,7 +156,7 @@ int main(int argc, char **argv_input)
 	if (ret != 0)
 		return -1;
 
-	printf("%s (ifindex=%d) cfg addr success.\n", dev, ifindex);
+	printf("%s (ifindex=%d) cfg addr success\n", dev, ifindex);
 	return 0;
 }
 

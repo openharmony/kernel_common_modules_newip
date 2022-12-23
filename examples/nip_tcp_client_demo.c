@@ -46,57 +46,73 @@
 #include <sched.h>
 #include <pthread.h>
 
+int _send(int cfd, int pkt_num)
+{
+	char buf[BUFLEN] = {0};
+	struct timeval sys_time;
+
+	gettimeofday(&sys_time, NULL);
+	sprintf(buf, "%ld %6ld NIP_TCP # %6d", sys_time.tv_sec, sys_time.tv_usec, pkt_num);
+
+	if (send(cfd, buf, PKTLEN, 0) < 0) {
+		perror("sendto");
+		return -1;
+	}
+
+	return 0;
+}
+
+int _recv(int cfd, int pkt_num, int *success)
+{
+	char buf[BUFLEN] = {0};
+	fd_set readfds;
+	int tmp;
+	struct timeval tv;
+
+	FD_ZERO(&readfds);
+	FD_SET(cfd, &readfds);
+	tv.tv_sec = 2;
+	tv.tv_usec = 0;
+	if (select(cfd + 1, &readfds, NULL, NULL, &tv) < 0) {
+		perror("select");
+		return -1;
+	}
+
+	if (FD_ISSET(cfd, &readfds)) {
+		int ret;
+		int no = 0;
+
+		ret = recv(cfd, buf, PKTLEN, MSG_WAITALL);
+		if (ret > 0) {
+			*success += 1;
+			ret = sscanf(buf, "%d %d NIP_TCP # %d", &tmp, &tmp, &no);
+			if (ret <= 0) {
+				perror("sscanf");
+				return -1;
+			}
+			printf("Received --%s sock %d success:%6d/%6d/no=%6d\n",
+			       buf, cfd, *success, pkt_num + 1, no);
+		} else {
+			printf("recv fail, ret=%d\n", ret);
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
 void *send_recv(void *args)
 {
-	char buf[BUFLEN];
-	int cfd, ret;
-	int sendtime_sec, sendtime_usec;
+	int cfd = ((struct thread_args *)args)->cfd;
 	int success = 0;
-	int count = 0;
-	int no = 0;
-	fd_set readfds;
-	struct timeval tv, stTime;
-	struct thread_args *th_args = (struct thread_args *) args;
 
-	cfd = th_args->cfd;
 	for (int i = 0; i < PKTCNT; i++) {
-		memset(buf, 0, BUFLEN);
-		(void)gettimeofday(&stTime, NULL);
-		sprintf(buf, "%ld %6ld NIP_TCP # %6d", stTime.tv_sec, stTime.tv_usec, count);
-		if (send(cfd, buf, PKTLEN, 0) < 0) {
-			perror("send");
+		if (_send(cfd, i) != 0)
 			goto END;
-		}
 
-		FD_ZERO(&readfds);
-		FD_SET(cfd, &readfds);
-		tv.tv_sec = SELECT_TIME;
-		tv.tv_usec = 0;
-		if (select(cfd + 1, &readfds, NULL, NULL, &tv) < 0) {
-			perror("select");
+		if (_recv(cfd, i, &success) != 0)
 			goto END;
-		}
 
-		if (FD_ISSET(cfd, &readfds)) {
-			memset(buf, 0, BUFLEN);
-			ret = recv(cfd, buf, PKTLEN, MSG_WAITALL);
-			if (ret > 0) {
-				success += 1;
-				(void)gettimeofday(&stTime, NULL);
-				ret = sscanf(buf, "%d %d NIP_TCP # %d",
-					     &sendtime_sec, &sendtime_usec, &no);
-				if (ret <= 0) {
-					perror("sscanf");
-					goto END;
-				}
-				printf("Received --%s sock %d success:%6d/%6d/no=%6d\n",
-				       buf, cfd, success, count + 1, no);
-			} else {
-				printf("recv fail, ret=%d\n", ret);
-				goto END;
-			}
-		}
-		count += 1;
 		usleep(SLEEP_US);
 	}
 

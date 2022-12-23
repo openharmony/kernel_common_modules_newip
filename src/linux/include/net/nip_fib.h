@@ -32,7 +32,7 @@ struct nip_fib_config {
 	int fc_ifindex;
 	u32 fc_flags;
 	u32 fc_protocol;
-	u32 fc_type;		/* only 8 bits are used */
+	u32 fc_type;  /* only 8 bits are used */
 
 	struct nip_addr fc_dst;
 	struct nip_addr fc_src;

@@ -99,7 +99,7 @@ struct nip_addr_field {
 };
 
 struct nip_addr {
-	unsigned char bitlen;	/* The address length is in bit (not byte) */
+	unsigned char bitlen; /* The address length is in bit (not byte) */
 	struct nip_addr_field v;
 };
 

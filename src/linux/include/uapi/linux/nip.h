@@ -41,7 +41,7 @@ struct nip_devreq {
 	} devreq;
 };
 
-#define nip_dev_addr devreq.addr	/* nip address */
-#define nip_dev_flags devreq.flags	/* net device flags */
+#define nip_dev_addr devreq.addr    /* nip address */
+#define nip_dev_flags devreq.flags  /* net device flags */
 
-#endif /*_UAPI_NEWIP_H*/
+#endif /*_UAPI_NEWIP_H */

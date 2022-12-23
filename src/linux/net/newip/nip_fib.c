@@ -162,7 +162,9 @@ int nip_fib_del(struct nip_rt_info *rt, struct nl_info *info)
 
 	hlist_del_init_rcu(&fn->fib_hlist);
 
-	/* 当fib_node释放后，fib_node指向的route_info才可释放 */
+	/* route_info directed by the fib_node can be released
+	 * only after the fib_node is released
+	 */
 	RCU_INIT_POINTER(rt->rt_node, NULL);
 	call_rcu(&fn->rcu, nip_fib_destroy_rcu);
 

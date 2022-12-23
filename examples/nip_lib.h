@@ -40,9 +40,12 @@
 #define DEMO_INPUT_4  5
 
 /* Change the value based on the actual interface */
-#define NIC_NAME "wlan0"
+#define NIC_NAME       "wlan0"
+#define NIC_NAME_CHECK "wlan"
+#define CMD_ADD        "add"
+#define CMD_DEL        "del"
 
-#define BUFLEN          2048
+#define BUFLEN          1024
 #define LISTEN_MAX      3
 #define PKTCNT          10      /* Number of sent packets */
 #define PKTLEN          1024    /* Length of sent packet */
@@ -51,8 +54,6 @@
 #define TCP_SERVER_PORT 5556    /* TCP Server Port */
 #define UDP_SERVER_PORT 9090    /* UDP Server Port */
 
-#define NAME_WLAN_LEN 4
-#define NAME_ETH_LEN  3
 #define ARRAY_LEN     255
 
 int nip_get_ifindex(const char *ifname, int *ifindex);

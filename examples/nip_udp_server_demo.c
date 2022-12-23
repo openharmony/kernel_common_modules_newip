@@ -59,7 +59,7 @@ void *recv_send(void *args)
 		memset(&si_remote, 0, sizeof(si_remote));
 		recv_num = recvfrom(fd, buf, BUFLEN, 0, (struct sockaddr *)&si_remote, &slen);
 		if (recv_num < 0) {
-			perror("recvfrom");
+			printf("server recvfrom fail, ret=%d\n", ret);
 			goto END;
 		} else if (recv_num == 0) { /* no data */
 			;
@@ -69,7 +69,7 @@ void *recv_send(void *args)
 			slen = sizeof(si_remote);
 			ret = sendto(fd, buf, BUFLEN, 0, (struct sockaddr *)&si_remote, slen);
 			if (ret < 0) {
-				perror("sendto");
+				printf("server sendto fail, ret=%d\n", ret);
 				goto END;
 			}
 			printf("Sending  -- %s -- to 0x%0x:%d\n", buf,

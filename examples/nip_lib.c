@@ -87,7 +87,7 @@ int nip_addr_fmt(char *addr_str, struct nip_addr *sap, int addrlen_input)
 		} else if (addr_str[i] >= 'a' && addr_str[i] <= 'f') {
 			addr_str[i] = addr_str[i] - STR_FMT_2;
 		} else {
-			printf("Newip addr error: uaddr[%d]=%c.\n", i, addr_str[i]);
+			printf("Newip addr error: uaddr[%d]=%c\n", i, addr_str[i]);
 			return 1;
 		}
 	}
@@ -110,7 +110,7 @@ int nip_addr_fmt(char *addr_str, struct nip_addr *sap, int addrlen_input)
 		addrlen = 0;
 
 	if (addrlen_input != addrlen) {
-		printf("Newip addr error, first_byte=0x%x.\n", first_byte);
+		printf("Newip addr error, first_byte=0x%x\n", first_byte);
 		return 1;
 	}
 
@@ -140,7 +140,7 @@ int nip_get_addr(char **args, struct nip_addr *addr)
 	}
 
 	if (addrlen_input % ADDR_STR_LEN != 0) {
-		printf("NewIP addr str-len invalid, addrlen_input=%d.\n", addrlen_input);
+		printf("NewIP addr str-len invalid, addrlen_input=%d\n", addrlen_input);
 		return -1;
 	}
 

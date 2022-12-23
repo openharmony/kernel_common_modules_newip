@@ -265,6 +265,72 @@ static int get_ns_payload_len(const struct nip_addr *solicit)
 	return sizeof(struct nip_icmp_hdr) + get_nip_addr_len(solicit);
 }
 
+static int nndisc_send_skb(struct net_device *dev,
+			   struct sk_buff *skb, struct nip_hdr_encap *head,
+			   const int payload_len)
+{
+	int ret = 0;
+	struct sock *sk = NULL;
+	struct dst_entry *dst = NULL;
+	u_short checksum = 0;
+
+	/* skip transport hdr */
+	skb_reserve(skb, payload_len);
+
+	/* set skb->data to point network header */
+	skb->data = skb_network_header(skb);
+	skb->len = head->hdr_buf_pos + payload_len;
+
+	dst = nndisc_dst_alloc(dev);
+	if (!dst) {
+		kfree_skb(skb);
+		return -ENOMEM;
+	}
+	/* add check sum */
+	checksum = nip_get_nndisc_send_checksum(skb, head, payload_len);
+	nip_insert_nndisc_send_checksum(skb, checksum);
+
+	skb_dst_set(skb, dst);
+	ret = dst_output(dev_net(skb->dev), sk, skb);
+	return ret;
+}
+
+static struct sk_buff *nndisc_alloc_skb(struct net_device *dev,
+					struct nip_hdr_encap *head, int payload_len)
+{
+	struct sk_buff *skb = NULL;
+	int len = NIP_ETH_HDR_LEN + NIP_HDR_MAX + payload_len;
+
+	skb = alloc_skb(len, 0);
+	if (!skb)
+		/* If you add log here, there will be an alarm:
+		 * WARNING: Possible unnecessary 'out of memory' message
+		 */
+		return skb;
+
+	skb->protocol = htons(ETH_P_NEWIP);
+	skb->ip_summed = CHECKSUM_NONE;
+	skb->csum = 0;
+	skb->dev = dev;
+	memset(NIPCB(skb), 0, sizeof(struct ninet_skb_parm));
+
+	NIPCB(skb)->dstaddr = head->daddr;
+	NIPCB(skb)->srcaddr = head->saddr;
+	NIPCB(skb)->nexthdr = head->nexthdr;
+	/* reserve space for hardware header */
+	skb_reserve(skb, NIP_ETH_HDR_LEN);
+	skb_reset_network_header(skb);
+
+	/* build nwk header */
+	head->hdr_buf = (unsigned char *)skb->data;
+	nip_hdr_comm_encap(head);
+	head->total_len = head->hdr_buf_pos + payload_len;
+	nip_update_total_len(head, htons(head->total_len));
+	skb_reserve(skb, head->hdr_buf_pos);
+	skb_reset_transport_header(skb);
+	return skb;
+}
+
 static void nndisc_send_ns(struct net_device *dev,
 			   const struct nip_addr *solicit,
 			   const struct nip_addr *daddr,
@@ -272,70 +338,24 @@ static void nndisc_send_ns(struct net_device *dev,
 {
 	int ret;
 	struct sk_buff *skb;
-	struct dst_entry *dst;
-	struct net *net;
-	struct sock *sk = NULL;
 	int payload_len = get_ns_payload_len(solicit);
-	int len = NIP_ETH_HDR_LEN + NIP_HDR_MAX + payload_len;
 	struct nip_hdr_encap head = {0};
-	unsigned short checksum;
 
 	head.saddr = *saddr;
 	head.daddr = *daddr;
 	head.ttl = NIP_ARP_DEFAULT_TTL;
 	head.nexthdr = IPPROTO_NIP_ICMP;
 
-	skb = alloc_skb(len, 0);
+	skb = nndisc_alloc_skb(dev, &head, payload_len);
 	if (!skb)
 		/* If you add log here, there will be an alarm:
 		 * WARNING: Possible unnecessary 'out of memory' message
 		 */
 		return;
-
-	skb->protocol = htons(ETH_P_NEWIP);
-	skb->dev = dev;
-	skb->ip_summed = CHECKSUM_NONE;
-	skb->csum = 0;
-	memset(NIPCB(skb), 0, sizeof(struct ninet_skb_parm));
-
-	NIPCB(skb)->dstaddr = head.daddr;
-	NIPCB(skb)->srcaddr = head.saddr;
-	NIPCB(skb)->nexthdr = head.nexthdr;
-
-	/* reserve space for hardware header */
-	skb_reserve(skb, NIP_ETH_HDR_LEN);
-	skb_reset_network_header(skb);
-
-	/* build nwk header */
-	head.hdr_buf = (unsigned char *)skb->data;
-	nip_hdr_comm_encap(&head);
-	head.total_len = head.hdr_buf_pos + payload_len;
-	nip_update_total_len(&head, htons(head.total_len));
-	skb_reserve(skb, head.hdr_buf_pos);
-	skb_reset_transport_header(skb);
-
-	/* build transport header */
+	/* build ns header */
 	nndisc_payload_ns_pack(solicit, skb);
-	skb_reserve(skb, payload_len);
 
-	skb->data = skb_network_header(skb);
-	skb->len = head.hdr_buf_pos + payload_len;
-
-	dst = nndisc_dst_alloc(dev);
-	if (!dst) {
-		kfree_skb(skb);
-		return;
-	}
-
-	/* add check sum*/
-	checksum = nip_get_nndisc_send_checksum(skb, &head, payload_len);
-	nip_insert_nndisc_send_checksum(skb, checksum);
-
-	skb_dst_set(skb, dst);
-	net = dev_net(skb->dev);
-
-	/* DST is set to SKB, and output is used to release SKB regardless of success or failure */
-	ret = dst_output(net, sk, skb);
+	ret = nndisc_send_skb(dev, skb, &head, payload_len);
 	if (ret)
 		nip_dbg("%s: dst output fail", __func__);
 }
@@ -399,71 +419,25 @@ static void nndisc_send_na(struct net_device *dev,
 {
 	int ret;
 	struct sk_buff *skb = NULL;
-	struct dst_entry *dst = NULL;
-	struct sock *sk = NULL;
-	int csummode = CHECKSUM_NONE;
 	int payload_len = get_na_payload_len(dev);
-	int len = NIP_ETH_HDR_LEN + NIP_HDR_MAX + payload_len;
 	u_char *smac = dev->dev_addr;
 	struct nip_hdr_encap head = {0};
-	u_short checksum = 0;
 
 	head.saddr = *saddr;
 	head.daddr = *daddr;
 	head.ttl = NIP_ARP_DEFAULT_TTL;
 	head.nexthdr = IPPROTO_NIP_ICMP;
 
-	skb = alloc_skb(len, 0);
+	skb = nndisc_alloc_skb(dev, &head, payload_len);
 	if (!skb)
 		/* If you add log here, there will be an alarm:
 		 * WARNING: Possible unnecessary 'out of memory' message
 		 */
 		return;
-
-	skb->protocol = htons(ETH_P_NEWIP);
-	skb->ip_summed = csummode;
-	skb->csum = 0;
-	skb->dev = dev;
-	memset(NIPCB(skb), 0, sizeof(struct ninet_skb_parm));
-
-	NIPCB(skb)->dstaddr = head.daddr;
-	NIPCB(skb)->srcaddr = head.saddr;
-	NIPCB(skb)->nexthdr = head.nexthdr;
-
-	/* reserve space for hardware header */
-	skb_reserve(skb, NIP_ETH_HDR_LEN);
-	skb_reset_network_header(skb);
-
-	/* build nwk header */
-	head.hdr_buf = (unsigned char *)skb->data;
-	nip_hdr_comm_encap(&head);
-	head.total_len = head.hdr_buf_pos + payload_len;
-	nip_update_total_len(&head, htons(head.total_len));
-	skb_reserve(skb, head.hdr_buf_pos);
-	skb_reset_transport_header(skb);
-
 	/* build na header */
 	build_na_hdr(smac, dev->addr_len, skb);
 
-	/* skip transport hdr */
-	skb_reserve(skb, payload_len);
-
-	/* set skb->data to point network header */
-	skb->data = skb_network_header(skb);
-	skb->len = head.hdr_buf_pos + payload_len;
-
-	dst = nndisc_dst_alloc(dev);
-	if (!dst) {
-		kfree_skb(skb);
-		return;
-	}
-
-	/* add check sum*/
-	checksum = nip_get_nndisc_send_checksum(skb, &head, payload_len);
-	nip_insert_nndisc_send_checksum(skb, checksum);
-
-	skb_dst_set(skb, dst);
-	ret = dst_output(dev_net(skb->dev), sk, skb);
+	ret = nndisc_send_skb(dev, skb, &head, payload_len);
 	if (ret)
 		nip_dbg("%s: dst output fail", __func__);
 }
@@ -475,22 +449,23 @@ bool nip_addr_local(struct net_device *dev, struct nip_addr *addr)
 
 	rcu_read_lock();
 	idev = __nin_dev_get(dev);
-	if (idev) {
-		read_lock_bh(&idev->lock);
-		if (!list_empty(&idev->addr_list)) {
-			struct ninet_ifaddr *ifp;
+	if (!idev)
+		goto out;
 
-			list_for_each_entry(ifp, &idev->addr_list, if_list) {
-				if (nip_addr_eq(addr, &ifp->addr)) {
-					ret = true;
-					break;
-				}
+	read_lock_bh(&idev->lock);
+	if (!list_empty(&idev->addr_list)) {
+		struct ninet_ifaddr *ifp;
+
+		list_for_each_entry(ifp, &idev->addr_list, if_list) {
+			if (nip_addr_eq(addr, &ifp->addr)) {
+				ret = true;
+				break;
 			}
 		}
-		read_unlock_bh(&idev->lock);
 	}
+	read_unlock_bh(&idev->lock);
+out:
 	rcu_read_unlock();
-
 	return ret;
 }
 
@@ -526,15 +501,14 @@ int nndisc_rcv_ns(struct sk_buff *skb)
 	eth = (struct ethhdr *)skb_mac_header(skb);
 	lladdr = eth->h_source;
 
-	/* checksum parse*/
+	/* checksum parse */
 	if (!nip_get_nndisc_rcv_checksum(skb, p)) {
 		nip_dbg("%s:ns ICMP checksum failed, drop the packet", __func__);
 		err = -EINVAL;
 		goto out;
 	}
 
-	neigh = __neigh_lookup(&nnd_tbl, &NIPCB(skb)->srcaddr, dev, lladdr ||
-			       !dev->addr_len);
+	neigh = __neigh_lookup(&nnd_tbl, &NIPCB(skb)->srcaddr, dev, lladdr || !dev->addr_len);
 	if (neigh) {
 		neigh_update(neigh, lladdr, NUD_STALE, NEIGH_UPDATE_F_OVERRIDE, 0);
 		neigh_release(neigh);

@@ -173,10 +173,10 @@ void tcp_nip_retransmit_timer(struct sock *sk)
 	icsk->icsk_rto = min(icsk->icsk_rto << 1, TCP_RTO_MAX);
 
 	ssthresh_dbg("%s seq %u, reset win %u to %u, rto %u to %u, pkt_out=%u",
-		     __func__, scb->seq, ntp->nip_ssthresh, g_ssthresh_low,
+		     __func__, scb->seq, ntp->nip_ssthresh, get_ssthresh_low(),
 		     icsk_rto_last, icsk->icsk_rto, tp->packets_out);
 
-	ntp->nip_ssthresh = g_ssthresh_low;
+	ntp->nip_ssthresh = get_ssthresh_low();
 
 	inet_csk_reset_xmit_timer(sk, ICSK_TIME_RETRANS, icsk->icsk_rto, TCP_RTO_MAX);
 }
@@ -198,7 +198,7 @@ void tcp_nip_probe_timer(struct sock *sk)
 	}
 
 	/* default: sock_net(sk)->ipv4.sysctl_tcp_retries2 */
-	max_probes = g_nip_probe_max; /* fix session auto close */
+	max_probes = get_nip_probe_max(); /* fix session auto close */
 
 	if (sock_flag(sk, SOCK_DEAD)) {
 		const bool alive = inet_csk_rto_backoff(icsk, TCP_RTO_MAX) < TCP_RTO_MAX;

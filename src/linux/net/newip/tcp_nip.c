@@ -18,37 +18,37 @@
  *
  * Description of States:
  *
- *	TCP_SYN_SENT		sent a connection request, waiting for ack
+ *    TCP_SYN_SENT      sent a connection request, waiting for ack
  *
- *	TCP_SYN_RECV		received a connection request, sent ack,
- *				waiting for final ack in three-way handshake.
+ *    TCP_SYN_RECV      received a connection request, sent ack,
+ *                      waiting for final ack in three-way handshake.
  *
- *	TCP_ESTABLISHED		connection established
+ *    TCP_ESTABLISHED   connection established
  *
- *	TCP_FIN_WAIT1		our side has shutdown, waiting to complete
- *				transmission of remaining buffered data
+ *    TCP_FIN_WAIT1     our side has shutdown, waiting to complete
+ *                      transmission of remaining buffered data
  *
- *	TCP_FIN_WAIT2		all buffered data sent, waiting for remote
- *				to shutdown
+ *    TCP_FIN_WAIT2     all buffered data sent, waiting for remote
+ *                      to shutdown
  *
- *	TCP_CLOSING		both sides have shutdown but we still have
- *				data we have to finish sending
+ *    TCP_CLOSING       both sides have shutdown but we still have
+ *                      data we have to finish sending
  *
- *	TCP_TIME_WAIT		timeout to catch resent junk before entering
- *				closed, can only be entered from FIN_WAIT2
- *				or CLOSING.  Required because the other end
- *				may not have gotten our last ACK causing it
- *				to retransmit the data packet (which we ignore)
+ *    TCP_TIME_WAIT     timeout to catch resent junk before entering
+ *                      closed, can only be entered from FIN_WAIT2
+ *                      or CLOSING.  Required because the other end
+ *                      may not have gotten our last ACK causing it
+ *                      to retransmit the data packet (which we ignore)
  *
- *	TCP_CLOSE_WAIT		remote side has shutdown and is waiting for
- *				us to finish writing our data and to shutdown
- *				(we have to close() to move on to LAST_ACK)
+ *    TCP_CLOSE_WAIT    remote side has shutdown and is waiting for
+ *                      us to finish writing our data and to shutdown
+ *                      (we have to close() to move on to LAST_ACK)
  *
- *	TCP_LAST_ACK		out side has shutdown after remote has
- *				shutdown.  There may still be data in our
- *				buffer that we have to finish sending
+ *    TCP_LAST_ACK      out side has shutdown after remote has
+ *                      shutdown.  There may still be data in our
+ *                      buffer that we have to finish sending
  *
- *	TCP_CLOSE		socket is finished
+ *    TCP_CLOSE         socket is finished
  */
 #define pr_fmt(fmt) "NIP-TCP: " fmt
 
@@ -91,8 +91,8 @@ static void tcp_nip_push(struct sock *sk, int flags, int mss_now,
 }
 
 static const unsigned char new_state[16] = {
-  /* current state:        new state:      action:	*/
-[0 /* (Invalid) */]	= TCP_CLOSE,
+  /* current state:        new state:      action: */
+[0]	= TCP_CLOSE,
 [TCP_ESTABLISHED]	= TCP_FIN_WAIT1 | TCP_ACTION_FIN,
 [TCP_SYN_SENT]	= TCP_CLOSE,
 [TCP_SYN_RECV]	= TCP_FIN_WAIT1 | TCP_ACTION_FIN,
@@ -245,11 +245,11 @@ static inline bool tcp_nip_need_reset(int state)
 }
 
 /* Function
- *	Initialize some of the parameters in request_sock
+ *    Initialize some of the parameters in request_sock
  * Parameter
- *	req: Request connection control block
- *	sk_listener: Transmission control block
- *	skb: Transfer control block buffer
+ *    req: Request connection control block
+ *    sk_listener: Transmission control block
+ *    skb: Transfer control block buffer
  */
 static void tcp_nip_init_req(struct request_sock *req,
 			     const struct sock *sk_listener,
@@ -262,11 +262,11 @@ static void tcp_nip_init_req(struct request_sock *req,
 }
 
 /* Function
- *	Initialize The initialization number SEQ. Calculate the initial serial number of
- *	the server based on part of the source address source port, part of the destination
- *	address, and destination port
+ *    Initialize The initialization number SEQ. Calculate the initial serial number of
+ *    the server based on part of the source address source port, part of the destination
+ *    address, and destination port
  * Parameter
- *	skb: Transfer control block buffer
+ *    skb: Transfer control block buffer
  */
 static __u32 tcp_nip_init_sequence(const struct sk_buff *skb)
 {
@@ -290,12 +290,12 @@ static struct dst_entry *tcp_nip_route_req(const struct sock *sk,
 }
 
 /* Function
- *	Functions used by the client transport layer to connect requests
- *	This parameter is used to set the source address, destination address and interface
+ *    Functions used by the client transport layer to connect requests
+ *    This parameter is used to set the source address, destination address and interface
  * Parameter
- *	sk: Transmission control block
- *	uaddr：The destination address
- *	addr_len：Destination address Length
+ *    sk: Transmission control block
+ *    uaddr：The destination address
+ *    addr_len：Destination address Length
  */
 static int tcp_nip_connect(struct sock *sk, struct sockaddr *uaddr,
 			   int addr_len)
@@ -407,7 +407,9 @@ failure:
 static void tcp_nip_send_reset(struct sock *sk, struct sk_buff *skb)
 {
 	const struct tcphdr *th = tcp_hdr(skb);
-	u32 seq = 0, ack_seq = 0, priority = gfp_any();
+	u32 seq = 0;
+	u32 ack_seq = 0;
+	u32 priority = gfp_any();
 
 	/* Never send a reset in response to a reset. */
 	if (th->rst)
@@ -424,14 +426,14 @@ static void tcp_nip_send_reset(struct sock *sk, struct sk_buff *skb)
 }
 
 /* Function
- *	function used by the server to send SYN+ACK segments
+ *    function used by the server to send SYN+ACK segments
  * Parameter
- *	sk: Transmission control block
- *	dst: routing。
- *	flowi: Flow control block
- *	req: Request connection control block
- *	foc: Fast open options
- *	synack_type: Type of the SYN+ACK segment
+ *    sk: Transmission control block
+ *    dst: routing。
+ *    flowi: Flow control block
+ *    req: Request connection control block
+ *    foc: Fast open options
+ *    synack_type: Type of the SYN+ACK segment
  */
 static int tcp_nip_send_synack(const struct sock *sk, struct dst_entry *dst,
 			       struct flowi *fl,
@@ -485,13 +487,13 @@ static const struct tcp_request_sock_ops tcp_request_sock_newip_ops = {
 };
 
 /* Function
- *	The route cache saves the transport control block from the SKB
+ *    The route cache saves the transport control block from the SKB
  * Parameter
- *	sk: Transmission control block
- *	skb: Transfer control block buffer
- *	req: Request connection control block
- *	dst: routing
- *	req_unhash: Request connection control block
+ *    sk: Transmission control block
+ *    skb: Transfer control block buffer
+ *    req: Request connection control block
+ *    dst: routing
+ *    req_unhash: Request connection control block
  */
 void ninet_sk_rx_dst_set(struct sock *sk, const struct sk_buff *skb)
 {
@@ -504,10 +506,10 @@ void ninet_sk_rx_dst_set(struct sock *sk, const struct sk_buff *skb)
 }
 
 /* Function
- *	A function used by the server to process client connection requests
+ *    A function used by the server to process client connection requests
  * Parameter
- *	sk: Transmission control block
- *	skb: Transfer control block buffer
+ *    sk: Transmission control block
+ *    skb: Transfer control block buffer
  */
 static int tcp_nip_conn_request(struct sock *sk, struct sk_buff *skb)
 {
@@ -516,13 +518,13 @@ static int tcp_nip_conn_request(struct sock *sk, struct sk_buff *skb)
 }
 
 /* Function
- *	Create child control blocks
+ *    Create child control blocks
  * Parameter
- *	sk: Transmission control block
- *	skb: Transfer control block buffer
- *	req: Request connection control block
- *	dst: routing
- *	req_unhash: Request connection control block
+ *    sk: Transmission control block
+ *    skb: Transfer control block buffer
+ *    req: Request connection control block
+ *    dst: routing
+ *    req_unhash: Request connection control block
  */
 static struct sock *tcp_nip_syn_recv_sock(const struct sock *sk, struct sk_buff *skb,
 					  struct request_sock *req,
@@ -705,12 +707,12 @@ void tcp_nip_keepalive_enable(struct sock *sk)
 
 			nip_dbg("%s HZ=%u, change time/probes/intvl [%u, %u, %u] to [%u, %u, %u]",
 				__func__, HZ, tp->keepalive_time, tp->keepalive_probes,
-				tp->keepalive_intvl, g_nip_keepalive_time, NIP_KEEPALIVE_PROBES,
-				g_nip_keepalive_intvl);
+				tp->keepalive_intvl, get_nip_keepalive_time(),
+				NIP_KEEPALIVE_PROBES, get_nip_keepalive_intvl());
 
-			tp->keepalive_time = g_nip_keepalive_time;
+			tp->keepalive_time = get_nip_keepalive_time();
 			tp->keepalive_probes = NIP_KEEPALIVE_PROBES;
-			tp->keepalive_intvl = g_nip_keepalive_intvl;
+			tp->keepalive_intvl = get_nip_keepalive_intvl();
 			inet_csk_reset_keepalive_timer(sk, tp->keepalive_time);
 		}
 		return;
@@ -726,8 +728,8 @@ void tcp_nip_keepalive_enable(struct sock *sk)
 	}
 
 	/* change para to nip para */
-	ret = tcp_nip_keepalive_para_update(sk, g_nip_keepalive_time,
-					    g_nip_keepalive_intvl,
+	ret = tcp_nip_keepalive_para_update(sk, get_nip_keepalive_time(),
+					    get_nip_keepalive_intvl(),
 					    NIP_KEEPALIVE_PROBES);
 	if (ret != 0) {
 		nip_dbg("%s fail, HZ=%u, time/probes/intvl [%u, %u, %u]", __func__,
@@ -757,7 +759,7 @@ void tcp_nip_keepalive_disable(struct sock *sk)
 		return;
 	}
 
-	if (ntp->idle_ka_probes_out < g_nip_idle_ka_probes_out)
+	if (ntp->idle_ka_probes_out < get_nip_idle_ka_probes_out())
 		return;
 
 	/* newip keepalive change to normal keepalive */
@@ -782,7 +784,7 @@ void tcp_nip_keepalive_disable(struct sock *sk)
 		sk->sk_prot->keepalive(sk, 0);
 	sock_valbool_flag(sk, SOCK_KEEPOPEN, 0);
 
-	nip_dbg("%s ok, HZ=%u, idle_ka_probes_out=%u", __func__, HZ, g_nip_idle_ka_probes_out);
+	nip_dbg("%s ok, HZ=%u, idle_ka_probes_out=%u", __func__, HZ, get_nip_idle_ka_probes_out());
 	ntp->nip_keepalive_enable = false;
 #endif
 }
@@ -793,7 +795,7 @@ static void _tcp_sock_priv_init(struct sock *sk)
 	struct tcp_nip_common *ntp = &tcp_nip_sk(sk)->common;
 
 	memset(ntp, 0, sizeof(*ntp));
-	ntp->nip_ssthresh = g_nip_ssthresh_default;
+	ntp->nip_ssthresh = get_nip_ssthresh_default();
 	tp->sacked_out = 0;
 	tp->rcv_tstamp = 0;
 	tp->selective_acks[0].start_seq = 0;
@@ -809,9 +811,9 @@ static void tcp_sock_priv_init(struct sock *sk)
 }
 
 /* Function
- *	Example Initialize sock information in TCP
+ *    Example Initialize sock information in TCP
  * Parameter
- *	sk: Sock to be initialized
+ *    sk: Sock to be initialized
  * Note: Currently, this function does not initialize timer, pre-queue, and congestion control,
  * and does not allow fast retransmission. No function is set to adjust MSS
  */
@@ -826,7 +828,7 @@ static int tcp_nip_init_sock(struct sock *sk)
 	tcp_nip_init_xmit_timers(sk);
 	INIT_LIST_HEAD(&tp->tsq_node);
 
-	icsk->icsk_rto = g_nip_rto == 0 ? TCP_TIMEOUT_INIT : (unsigned int)(HZ / g_nip_rto);
+	icsk->icsk_rto = get_nip_rto() == 0 ? TCP_TIMEOUT_INIT : (HZ / get_nip_rto());
 	icsk->icsk_rto_min = TCP_RTO_MIN;
 	icsk->icsk_delack_max = TCP_DELACK_MAX;
 	tp->mdev_us = jiffies_to_usecs(TCP_TIMEOUT_INIT);
@@ -846,8 +848,8 @@ static int tcp_nip_init_sock(struct sock *sk)
 
 	icsk->icsk_sync_mss = tcp_nip_sync_mss;
 
-	WRITE_ONCE(sk->sk_sndbuf, g_nip_sndbuf); // sock_net(sk)->ipv4.sysctl_tcp_wmem[1]
-	WRITE_ONCE(sk->sk_rcvbuf, g_nip_rcvbuf); // sock_net(sk)->ipv4.sysctl_tcp_rmem[1]
+	WRITE_ONCE(sk->sk_sndbuf, get_nip_sndbuf()); // sock_net(sk)->ipv4.sysctl_tcp_wmem[1]
+	WRITE_ONCE(sk->sk_rcvbuf, get_nip_rcvbuf()); // sock_net(sk)->ipv4.sysctl_tcp_rmem[1]
 
 	local_bh_disable();
 	sk_sockets_allocated_inc(sk);
@@ -913,8 +915,11 @@ int tcp_nip_sendmsg(struct sock *sk, struct msghdr *msg, size_t size)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
 	struct sk_buff *skb;
-	int flags, err, copied = 0;
-	int mss_now = 0, size_goal;
+	int flags;
+	int err;
+	int copied = 0;
+	int mss_now = 0;
+	int size_goal;
 	bool process_backlog = false;
 	long timeo;
 
@@ -1058,8 +1063,7 @@ void tcp_nip_cleanup_rbuf(struct sock *sk, int copied)
 	if (inet_csk_ack_scheduled(sk)) {
 		const struct inet_connection_sock *icsk = inet_csk(sk);
 
-		if (/* Once-per-two-segments ACK was not sent */
-		    tp->rcv_nxt - tp->rcv_wup > (g_ack_num * 20 * icsk->icsk_ack.rcv_mss) ||
+		if (tp->rcv_nxt - tp->rcv_wup > (get_ack_num() * 20 * icsk->icsk_ack.rcv_mss) ||
 		    /* If this read emptied read buffer, we send ACK, if
 		     * connection is not bidirectional, user drained
 		     * receive buffer and there was a small segment
@@ -1288,10 +1292,10 @@ void tcp_nip_destroy_sock(struct sock *sk)
 }
 
 /* Function
- *	The sock handler for THE LISTEN and ESTABLISHED states is called by tcp_nip_rCV
+ *    The sock handler for THE LISTEN and ESTABLISHED states is called by tcp_nip_rCV
  * Parameter
- *	skb: Packets received from the network layer
- *	sk: A SOCK instance needs to be processed
+ *    skb: Packets received from the network layer
+ *    sk: A SOCK instance needs to be processed
  */
 static int tcp_nip_do_rcv(struct sock *sk, struct sk_buff *skb)
 {
@@ -1325,13 +1329,13 @@ discard:
 }
 
 /* Function:
- *	Fill the TCP header field in SKB into the TCP private control block,
- *	because the TCP header field in SKB is the network byte order,
- *	in order to facilitate later call, need to convert the host byte order
- *	and store in the TCP control block.
+ *    Fill the TCP header field in SKB into the TCP private control block,
+ *    because the TCP header field in SKB is the network byte order,
+ *    in order to facilitate later call, need to convert the host byte order
+ *    and store in the TCP control block.
  * Parameter：
- *	skb：Packets delivered by the network layer
- *	th：TCP header field in a packet
+ *    skb：Packets delivered by the network layer
+ *    th：TCP header field in a packet
  */
 static void tcp_nip_fill_cb(struct sk_buff *skb, const struct tcphdr *th)
 {
@@ -1375,10 +1379,10 @@ static bool tcp_nip_add_backlog(struct sock *sk, struct sk_buff *skb)
 }
 
 /* Function
- *	TCP is the gateway from the network layer to the transport layer
- *	and receives data packets from the network layer
+ *    TCP is the gateway from the network layer to the transport layer
+ *    and receives data packets from the network layer
  * Parameter
- *	skb：Packets delivered by the network layer
+ *    skb：Packets delivered by the network layer
  */
 static int tcp_nip_rcv(struct sk_buff *skb)
 {
@@ -1571,10 +1575,10 @@ void tcp_nip_done(struct sock *sk)
 }
 
 /* Function
- *	Disconnect the connection to the peer end, non-blocking
- *	Release read/write queue, send RST (not sent yet), clear timer
+ *    Disconnect the connection to the peer end, non-blocking
+ *    Release read/write queue, send RST (not sent yet), clear timer
  * Parameter
- *	sk: Transmission control block
+ *    sk: Transmission control block
  */
 int tcp_nip_disconnect(struct sock *sk, int flags)
 {
@@ -1749,7 +1753,7 @@ void nip_dbg(const char *fmt, ...)
 	va_list args;
 	int len = 0;
 
-	if (!g_nip_debug)
+	if (!get_nip_debug())
 		return;
 
 	memset(str, 0, sizeof(str));

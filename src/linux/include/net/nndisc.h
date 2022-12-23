@@ -18,8 +18,8 @@
 #define NEWIP_NEIGH_BUCKET_MAX 8
 extern struct neigh_table nnd_tbl;
 
-#define NIP_ARP_NS	0x01	/* ARP request */
-#define NIP_ARP_NA	0x02	/* ARP response */
+#define NIP_ARP_NS  0x01 /* ARP request */
+#define NIP_ARP_NA  0x02 /* ARP response */
 
 struct nnd_msg {
 	struct nip_icmp_hdr icmph;
