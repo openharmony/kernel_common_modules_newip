@@ -19,9 +19,8 @@
 struct net;
 struct nip_addr;
 DECLARE_HOOK(ninet_ehashfn_hook,
-		TP_PROTO(const struct net *net, const struct nip_addr *laddr, const u16 lport,
-			const struct nip_addr *faddr, const __be16 fport, u32 *ret),
-		TP_ARGS(net, laddr, lport, faddr, fport, ret)
+		TP_PROTO(const struct sock *sk, u32 *ret),
+		TP_ARGS(sk, ret)
 );
 
 struct net_device;

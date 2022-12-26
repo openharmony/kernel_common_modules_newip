@@ -11,11 +11,10 @@
 #include <net/if_ninet.h>
 #include <trace/hooks/nip_hooks.h>
 
-void ninet_ehashfn_hook(void *data, const struct net *net,
-			const struct nip_addr *laddr, const u16 lport,
-			const struct nip_addr *faddr, const __be16 fport, u32 *ret)
+void ninet_ehashfn_hook(void *data, const struct sock *sk, u32 *ret)
 {
-	*ret = ninet_ehashfn(net, laddr, lport, faddr, fport);
+	*ret = ninet_ehashfn(sock_net(sk), &sk->sk_nip_rcv_saddr,
+			     sk->sk_num, &sk->sk_nip_daddr, sk->sk_dport);
 }
 
 void ninet_gifconf_hook(void *data, struct net_device *dev,
