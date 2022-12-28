@@ -8,7 +8,7 @@
  * Based on net/ipv6/icmp.c
  * Based on net/ipv4/af_inet.c
  */
-#define pr_fmt(fmt) "NIP-ICMP: " fmt
+#define pr_fmt(fmt) KBUILD_MODNAME ": [%s:%d] " fmt, __func__, __LINE__
 
 #include <linux/module.h>
 #include <linux/errno.h>
@@ -29,6 +29,7 @@
 #include <net/nndisc.h>
 
 #include "nip_hdr.h"
+#include "tcp_nip_parameter.h"
 
 int nip_icmp_rcv(struct sk_buff *skb)
 {
@@ -36,7 +37,7 @@ int nip_icmp_rcv(struct sk_buff *skb)
 	struct nip_icmp_hdr *hdr = nip_icmp_header(skb);
 	u8 type = hdr->nip_icmp_type;
 
-	nip_dbg("rcv newip icmp packet. type = %u", type);
+	nip_dbg("rcv newip icmp packet. type=%u", type);
 	switch (type) {
 	case NIP_ARP_NS:
 	case NIP_ARP_NA:

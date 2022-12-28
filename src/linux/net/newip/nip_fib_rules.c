@@ -7,12 +7,13 @@
  * Based on net/ipv6/fib_rules.c
  * Based on net/ipv6/fib6_rules.c
  */
-#define pr_fmt(fmt) "NIP: " fmt
+#define pr_fmt(fmt) KBUILD_MODNAME ": [%s:%d] " fmt, __func__, __LINE__
 
 #include <net/nip_fib.h>
 #include <linux/netdevice.h>
 #include <linux/notifier.h>
 #include <linux/export.h>
+#include "tcp_nip_parameter.h"
 
 struct dst_entry *nip_fib_rule_lookup(struct net *net, struct flow_nip *fln,
 				      int flags, nip_pol_lookup_t lookup)

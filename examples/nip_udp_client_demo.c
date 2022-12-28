@@ -118,8 +118,8 @@ END:	return NULL;
 
 int main(int argc, char **argv)
 {
-	int cfd;
 	pthread_t th;
+	int cfd;
 	struct thread_args th_args;
 	struct sockaddr_nin si_server;
 

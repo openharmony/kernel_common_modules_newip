@@ -5,11 +5,12 @@
  * Definitions for the NewIP Hooks Register module.
  */
 #ifdef CONFIG_NEWIP_HOOKS
-#define pr_fmt(fmt) "NIP: " fmt
+#define pr_fmt(fmt) KBUILD_MODNAME ": [%s:%d] " fmt, __func__, __LINE__
 
 #include <net/ninet_hashtables.h>      /* ninet_ehashfn */
 #include <net/if_ninet.h>
 #include <trace/hooks/nip_hooks.h>
+#include "tcp_nip_parameter.h"
 
 void ninet_ehashfn_hook(void *data, const struct sock *sk, u32 *ret)
 {

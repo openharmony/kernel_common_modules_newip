@@ -15,7 +15,7 @@
  * Based on include/net/ipv6.h
  * Based on net/core/secure_seq.c
  */
-#define pr_fmt(fmt) "NIP: " fmt
+#define pr_fmt(fmt) KBUILD_MODNAME ": [%s:%d] " fmt, __func__, __LINE__
 
 #include <linux/module.h>
 #include <linux/random.h>
@@ -25,6 +25,7 @@
 #include <net/inet_hashtables.h>
 #include <net/ninet_hashtables.h>
 #include <net/secure_seq.h>
+#include "tcp_nip_parameter.h"
 
 static siphash_key_t net_secret __read_mostly;
 
@@ -294,7 +295,7 @@ begin:
 		if (!NINET_MATCH(sk, net, saddr, daddr, ports, dif))
 			continue;
 		if (unlikely(!refcount_inc_not_zero(&sk->sk_refcnt))) {
-			nip_dbg("[nip]%s:sk->sk_refcnt == 0", __func__);
+			nip_dbg("sk->sk_refcnt == 0");
 			goto out;
 		}
 
@@ -359,12 +360,12 @@ static struct sock *ninet_lhash2_lookup(struct net *net,
 		sk = (struct sock *)icsk;
 		score = nip_tcp_compute_score(sk, net, hnum, daddr, dif, sdif);
 		if (score > hiscore) {
-			nip_dbg("%s: find sock in lhash table", __func__);
+			nip_dbg("find sock in lhash table");
 			result = sk;
 			hiscore = score;
 			reuseport = sk->sk_reuseport;
 			if (reuseport) {
-				nip_dbg("%s: find reuseport sock in lhash table", __func__);
+				nip_dbg("find reuseport sock in lhash table");
 				phash = ninet_ehashfn(net, daddr, hnum, saddr, sport);
 				matches = 1;
 			}
@@ -438,7 +439,7 @@ static int __ninet_check_established(struct inet_timewait_death_row *death_row,
 
 		if (likely(NINET_MATCH(sk2, net,
 				       saddr, daddr, ports, dif))) {
-			nip_dbg("%s: found same sk in ehash", __func__);
+			nip_dbg("found same sk in ehash");
 			goto not_unique;
 		}
 	}
@@ -446,7 +447,7 @@ static int __ninet_check_established(struct inet_timewait_death_row *death_row,
 	/* Must record num and sport now. Otherwise we will see
 	 * in hash table socket with a funny identity.
 	 */
-	nip_dbg("%s: add tcp sock into ehash table. sport=%u", __func__, lport);
+	nip_dbg("add tcp sock into ehash table. sport=%u", lport);
 	inet->inet_num = lport;
 	inet->inet_sport = htons(lport);
 	sk->sk_hash = hash;

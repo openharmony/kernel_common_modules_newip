@@ -10,8 +10,11 @@
  * DEVICE - NEWIP device support.
  * Based on net/ipv4/devinet.c
  */
+#define pr_fmt(fmt) KBUILD_MODNAME ": [%s:%d] " fmt, __func__, __LINE__
+
 #include <net/nip_fib.h>
 #include <net/nip_addrconf.h>
+#include "tcp_nip_parameter.h"
 
 int ninet_gifconf(struct net_device *dev, char __user *buf, int len, int size)
 {

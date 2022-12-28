@@ -10,7 +10,7 @@
  *
  * Based on net/ipv4/ip_sockglue.c
  */
-#define pr_fmt(fmt) "NIP: " fmt
+#define pr_fmt(fmt) KBUILD_MODNAME ": [%s:%d] " fmt, __func__, __LINE__
 
 #include <linux/module.h>
 #include <linux/types.h>
@@ -23,6 +23,7 @@
 #include <net/nip_udp.h>
 #include <net/route.h>
 #include <net/nip_fib.h>
+#include "tcp_nip_parameter.h"
 
 #define NIP_OPTNAME_MAX 255
 

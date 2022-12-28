@@ -111,8 +111,8 @@ int parse_name(char **argv, int *ifindex, char *dev)
 
 int parse_cmd(char **argv, int *opt)
 {
-	char cmd[ARRAY_LEN];
 	int len = strlen(*argv);
+	char cmd[ARRAY_LEN];
 
 	memset(cmd, 0, ARRAY_LEN);
 	if (!len || len >= (ARRAY_LEN - 1))

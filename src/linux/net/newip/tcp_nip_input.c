@@ -13,7 +13,7 @@
  * Based on net/ipv4/tcp_output.c
  * Based on net/ipv4/tcp_minisocks.c
  */
-#define pr_fmt(fmt) "NIP-TCP: " fmt
+#define pr_fmt(fmt) KBUILD_MODNAME ": [%s:%d] " fmt, __func__, __LINE__
 
 #include <net/dst.h>
 #include <net/tcp.h>
@@ -33,7 +33,7 @@
 #define FLAG_DATA_SACKED        0x20   /* New SACK.                                */
 #define FLAG_ECE                0x40   /* ECE in this ACK                          */
 #define FLAG_LOST_RETRANS       0x80   /* This ACK marks some retransmission lost  */
-#define FLAG_SLOWPATH           0x100  /* Do not skip RFC checks for window update.*/
+#define FLAG_SLOWPATH           0x100  /* Do not skip RFC checks for window update */
 #define FLAG_ORIG_SACK_ACKED    0x200  /* Never retransmitted data are (s)acked    */
 #define FLAG_SND_UNA_ADVANCED   0x400  /* Snd_una was changed (!= FLAG_DATA_ACKED) */
 #define FLAG_DSACKING_ACK       0x800  /* SACK blocks contained D-SACK info        */
@@ -97,7 +97,7 @@ void tcp_nip_fin(struct sock *sk)
 		/* Only TCP_LISTEN and TCP_CLOSE are left, in these
 		 * cases we should never reach this piece of code.
 		 */
-		nip_dbg("%s: Impossible, sk->sk_state=%d", __func__, sk->sk_state);
+		nip_dbg("Impossible, sk->sk_state=%d", sk->sk_state);
 		break;
 	}
 
@@ -220,30 +220,30 @@ static void tcp_nip_data_queue(struct sock *sk, struct sk_buff *skb)
 	tp->snd_up = tp->snd_up > PKT_DISCARD_MAX ? 0 : tp->snd_up;
 
 	if (TCP_SKB_CB(skb)->seq == TCP_SKB_CB(skb)->end_seq) {
-		nip_dbg("%s: no data, only handle ack", __func__);
+		nip_dbg("no data, only handle ack");
 		__kfree_skb(skb);
 		return;
 	}
 
 	if (TCP_SKB_CB(skb)->seq == tp->rcv_nxt) {
 		if (cur_win == 0) {
-			nip_dbg("%s: rcv window is 0", __func__);
+			nip_dbg("rcv window is 0");
 			goto out_of_window;
 		}
 	}
 
 	/* Out of window. F.e. zero window probe. */
 	if (!before(TCP_SKB_CB(skb)->seq, seq_max)) {
-		nip_dbg("%s: out of rcv win, seq=[%u-%u], rcv_nxt=%u, seq_max=%u",
-			__func__, TCP_SKB_CB(skb)->seq, TCP_SKB_CB(skb)->end_seq,
+		nip_dbg("out of rcv win, seq=[%u-%u], rcv_nxt=%u, seq_max=%u",
+			TCP_SKB_CB(skb)->seq, TCP_SKB_CB(skb)->end_seq,
 			tp->rcv_nxt, seq_max);
 		goto out_of_window;
 	}
 
 	if (!after(TCP_SKB_CB(skb)->end_seq, tp->rcv_nxt)) {
 		/* A retransmit, 2nd most common case.  Force an immediate ack. */
-		nip_dbg("%s: rcv retransmit pkt, seq=[%u-%u], rcv_nxt=%u",
-			__func__, TCP_SKB_CB(skb)->seq, TCP_SKB_CB(skb)->end_seq, tp->rcv_nxt);
+		nip_dbg("rcv retransmit pkt, seq=[%u-%u], rcv_nxt=%u",
+			TCP_SKB_CB(skb)->seq, TCP_SKB_CB(skb)->end_seq, tp->rcv_nxt);
 out_of_window:
 		inet_csk_schedule_ack(sk);
 		tcp_drop(sk, skb);
@@ -253,8 +253,8 @@ out_of_window:
 	__skb_pull(skb, tcp_hdr(skb)->doff * TCP_NUM_4);
 
 	if (cur_win == 0 || after(TCP_SKB_CB(skb)->end_seq, seq_max)) {
-		nip_dbg("%s: win lack, drop pkt, seq=[%u-%u], seq_max=%u, rmem_alloc/rbuf=[%u:%u]",
-			__func__, TCP_SKB_CB(skb)->seq, TCP_SKB_CB(skb)->end_seq,
+		nip_dbg("win lack, drop pkt, seq=[%u-%u], seq_max=%u, rmem_alloc/rbuf=[%u:%u]",
+			TCP_SKB_CB(skb)->seq, TCP_SKB_CB(skb)->end_seq,
 			seq_max, atomic_read(&sk->sk_rmem_alloc), sk->sk_rcvbuf);
 		/* wake up processes that are blocked for lack of data */
 		sk->sk_data_ready(sk);
@@ -272,8 +272,8 @@ out_of_window:
 		if (TCP_SKB_CB(skb)->seq != tp->rcv_nxt)
 			tcp_nip_overlap_handle(tp, skb);
 
-		nip_dbg("%s: newip packet received. seq=[%u-%u], rcv_nxt=%u, skb->len=%u",
-			__func__, TCP_SKB_CB(skb)->seq, TCP_SKB_CB(skb)->end_seq,
+		nip_dbg("packet received. seq=[%u-%u], rcv_nxt=%u, skb->len=%u",
+			TCP_SKB_CB(skb)->seq, TCP_SKB_CB(skb)->end_seq,
 			tp->rcv_nxt, skb->len);
 
 		__skb_queue_tail(&sk->sk_receive_queue, skb);
@@ -289,8 +289,8 @@ out_of_window:
 		return;
 	}
 
-	nip_dbg("%s: newip ofo packet received. seq=[%u-%u], rcv_nxt=%u, skb->len=%u",
-		__func__, TCP_SKB_CB(skb)->seq, TCP_SKB_CB(skb)->end_seq,
+	nip_dbg("ofo packet received. seq=[%u-%u], rcv_nxt=%u, skb->len=%u",
+		TCP_SKB_CB(skb)->seq, TCP_SKB_CB(skb)->end_seq,
 		tp->rcv_nxt, skb->len);
 
 	tcp_nip_data_queue_ofo(sk, skb);
@@ -341,7 +341,7 @@ void tcp_nip_send_delayed_ack(struct sock *sk)
 	if (icsk->icsk_ack.pending & ICSK_ACK_TIMER) {
 		if (time_before_eq(icsk->icsk_ack.timeout,
 				   jiffies + (ato >> TCP_NIP_4BYTE_PAYLOAD))) {
-			nip_dbg("%s: ok", __func__);
+			nip_dbg("ok");
 			tcp_nip_send_ack(sk);
 			return;
 		}
@@ -409,9 +409,15 @@ static void tcp_nip_snd_una_update(struct tcp_sock *tp, u32 ack)
 void tcp_nip_rearm_rto(struct sock *sk)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
+	struct inet_connection_sock *icsk = inet_csk(sk);
 
 	if (!tp->packets_out) {
+		int icsk_backoff = icsk->icsk_backoff;
+
 		inet_csk_clear_xmit_timer(sk, ICSK_TIME_RETRANS);
+		icsk->icsk_backoff = 0; /* V4 no modified this line */
+		nip_dbg("stop tcp retrans timer, icsk_backoff %u to %u",
+			icsk_backoff, icsk->icsk_backoff);
 	} else {
 		u32 rto = inet_csk(sk)->icsk_rto;
 
@@ -433,7 +439,7 @@ static int tcp_nip_clean_rtx_queue(struct sock *sk, ktime_t *skb_snd_tstamp)
 		if (after(scb->end_seq, tp->snd_una)) {
 			if (tcp_skb_pcount(skb) == 1 || !after(tp->snd_una, scb->seq))
 				break;
-			nip_dbg("%s: ack error", __func__);
+			nip_dbg("ack error");
 		} else {
 			prefetchw(skb->next);
 			acked_pcount = tcp_skb_pcount(skb);
@@ -455,7 +461,7 @@ static int tcp_nip_clean_rtx_queue(struct sock *sk, ktime_t *skb_snd_tstamp)
 		sk_wmem_free_skb(sk, skb);
 	}
 
-	icsk->icsk_rto = (unsigned int)(HZ / get_nip_rto());
+	icsk->icsk_rto = (unsigned int)(HZ / get_nip_rto()); /* V4 no modified this line */
 	if (flag & FLAG_ACKED)
 		tcp_nip_rearm_rto(sk);
 	return 0;
@@ -506,7 +512,7 @@ void tcp_nip_parse_mss(struct tcp_options_received *opt_rx,
 	if (opsize == TCPOLEN_MSS && th->syn && !estab) {
 		u16 in_mss = get_unaligned_be16(ptr);
 
-		nip_dbg("%s: in_mss %d", __func__, in_mss);
+		nip_dbg("in_mss %d", in_mss);
 
 		if (in_mss) {
 			if (opt_rx->user_mss &&
@@ -803,8 +809,8 @@ int _tcp_nip_conn_request(struct request_sock_ops *rsk_ops,
 	 */
 	if (sk_acceptq_is_full(sk)) {
 		NET_INC_STATS(sock_net(sk), LINUX_MIB_LISTENOVERFLOWS);
-		nip_dbg("%s sk_acceptq_is_full, sk_ack_backlog=%u, sk_max_ack_backlog=%u",
-			__func__, READ_ONCE(sk->sk_ack_backlog),
+		nip_dbg("sk_acceptq_is_full, sk_ack_backlog=%u, sk_max_ack_backlog=%u",
+			READ_ONCE(sk->sk_ack_backlog),
 			READ_ONCE(sk->sk_max_ack_backlog));
 		goto drop;
 	}
@@ -904,7 +910,7 @@ static void tcp_nip_ack_update_window(struct sock *sk, const struct sk_buff *skb
 		tcp_update_wl(tp, ack_seq);
 
 		if (tp->snd_wnd != nwin) {
-			nip_dbg("%s snd_wnd change [%u to %u]", __func__, tp->snd_wnd, nwin);
+			nip_dbg("snd_wnd change [%u to %u]", tp->snd_wnd, nwin);
 			tp->snd_wnd = nwin;
 			tp->pred_flags = 0;
 		}
@@ -921,7 +927,8 @@ static void tcp_nip_ack_probe(struct sock *sk)
 
 	if (!after(TCP_SKB_CB(tcp_nip_send_head(sk))->end_seq, tcp_wnd_end(tp))) {
 		icsk->icsk_backoff = 0;
-		nip_dbg("%s stop probe0 timer", __func__);
+		icsk->icsk_probes_tstamp = 0;
+		nip_dbg("stop probe0 timer");
 		inet_csk_clear_xmit_timer(sk, ICSK_TIME_PROBE0);
 		/* Socket must be waked up by subsequent tcp_data_snd_check().
 		 * This function is not for random using!
@@ -931,8 +938,8 @@ static void tcp_nip_ack_probe(struct sock *sk)
 		unsigned long base_when = tcp_probe0_base(sk);
 		u8 icsk_backoff = inet_csk(sk)->icsk_backoff;
 
-		nip_dbg("%s start probe0 timer, when=%u, RTO MAX=%u, base_when=%u, backoff=%u",
-			__func__, when, TCP_RTO_MAX, base_when, icsk_backoff);
+		nip_dbg("start probe0 timer, when=%lu, RTO MAX=%u, base_when=%lu, backoff=%u",
+			when, TCP_RTO_MAX, base_when, icsk_backoff);
 		inet_csk_reset_xmit_timer(sk, ICSK_TIME_PROBE0, when, TCP_RTO_MAX);
 	}
 }
@@ -951,8 +958,8 @@ static void tcp_nip_ack_retrans(struct sock *sk, u32 ack, int ack_type, u32 retr
 
 	skb_queue_walk_safe(&sk->sk_write_queue, skb, tmp) {
 		if (skb == tcp_nip_send_head(sk)) {
-			ssthresh_dbg("%s %s ack retrans(%u) end, ack=%u, seq=%u~%u, pkt_out=%u",
-				     __func__, ack_str[index], ntp->ack_retrans_num, ack,
+			ssthresh_dbg("%s ack retrans(%u) end, ack=%u, seq=%u~%u, pkt_out=%u",
+				     ack_str[index], ntp->ack_retrans_num, ack,
 				     tp->selective_acks[0].start_seq,
 				     tp->selective_acks[0].end_seq, tp->packets_out);
 			tp->selective_acks[0].start_seq = 0;
@@ -963,8 +970,8 @@ static void tcp_nip_ack_retrans(struct sock *sk, u32 ack, int ack_type, u32 retr
 		}
 
 		if (TCP_SKB_CB(skb)->seq > tp->selective_acks[0].end_seq) {
-			ssthresh_dbg("%s %s ack retrans(%u) finish, ack=%u, seq=%u~%u, pkt_out=%u",
-				     __func__, ack_str[index], ntp->ack_retrans_num, ack,
+			ssthresh_dbg("%s ack retrans(%u) finish, ack=%u, seq=%u~%u, pkt_out=%u",
+				     ack_str[index], ntp->ack_retrans_num, ack,
 				     tp->selective_acks[0].start_seq,
 				     tp->selective_acks[0].end_seq, tp->packets_out);
 
@@ -984,8 +991,8 @@ static void tcp_nip_ack_retrans(struct sock *sk, u32 ack, int ack_type, u32 retr
 			ntp->ack_retrans_num++;
 			ntp->ack_retrans_seq = TCP_SKB_CB(skb)->end_seq;
 		} else {
-			retrans_dbg("%s %s ack retrans(%u) no end, ack=%u, seq=%u~%u, pkt_out=%u",
-				    __func__, ack_str[index], ntp->ack_retrans_num, ack,
+			retrans_dbg("%s ack retrans(%u) no end, ack=%u, seq=%u~%u, pkt_out=%u",
+				    ack_str[index], ntp->ack_retrans_num, ack,
 				    tp->selective_acks[0].start_seq,
 				    tp->selective_acks[0].end_seq, tp->packets_out);
 			break;
@@ -1014,8 +1021,8 @@ static void tcp_nip_dup_ack_retrans(struct sock *sk, const struct sk_buff *skb,
 			u32 last_nip_ssthresh = ntp->nip_ssthresh;
 
 			if (tp->selective_acks[0].end_seq)
-				ssthresh_dbg("%s last retans(%u) not end, seq=%u~%u, pkt_out=%u",
-					     __func__, ntp->ack_retrans_num,
+				ssthresh_dbg("last retans(%u) not end, seq=%u~%u, pkt_out=%u",
+					     ntp->ack_retrans_num,
 					     tp->selective_acks[0].start_seq,
 					     tp->selective_acks[0].end_seq,
 					     tp->packets_out);
@@ -1026,8 +1033,8 @@ static void tcp_nip_dup_ack_retrans(struct sock *sk, const struct sk_buff *skb,
 			ntp->ack_retrans_num = 0;
 
 			ntp->nip_ssthresh = get_ssthresh_low();
-			ssthresh_dbg("%s new dup ack, win %u to %u, discard_num=%u, seq=%u~%u",
-				     __func__, last_nip_ssthresh, ntp->nip_ssthresh, discard_num,
+			ssthresh_dbg("new dup ack, win %u to %u, discard_num=%u, seq=%u~%u",
+				     last_nip_ssthresh, ntp->nip_ssthresh, discard_num,
 				     tp->selective_acks[0].start_seq,
 				     tp->selective_acks[0].end_seq);
 
@@ -1043,8 +1050,8 @@ static void tcp_nip_nor_ack_retrans(struct sock *sk, u32 ack, u32 retrans_num)
 
 	if (tp->selective_acks[0].end_seq != 0) {
 		if (ack >= tp->selective_acks[0].end_seq) {
-			ssthresh_dbg("%s nor ack retrans(%u) resume, seq=%u~%u, pkt_out=%u, ack=%u",
-				     __func__, ntp->ack_retrans_num,
+			ssthresh_dbg("nor ack retrans(%u) resume, seq=%u~%u, pkt_out=%u, ack=%u",
+				     ntp->ack_retrans_num,
 				     tp->selective_acks[0].start_seq,
 				     tp->selective_acks[0].end_seq, tp->packets_out, ack);
 			tp->selective_acks[0].start_seq = 0;
@@ -1072,8 +1079,8 @@ static void tcp_nip_ack_calc_ssthresh(struct sock *sk, u32 ack, int icsk_rto_las
 	u32 nip_ssthresh;
 
 	if (ntp->nip_ssthresh_reset != ack_reset) {
-		ssthresh_dbg("%s ack reset win %u to %u, ack=%u",
-			     __func__, ntp->nip_ssthresh, get_ssthresh_low(), ack);
+		ssthresh_dbg("ack reset win %u to %u, ack=%u",
+			     ntp->nip_ssthresh, get_ssthresh_low(), ack);
 		ntp->nip_ssthresh_reset = ack_reset;
 		ntp->nip_ssthresh = get_ssthresh_low();
 	} else {
@@ -1081,21 +1088,21 @@ static void tcp_nip_ack_calc_ssthresh(struct sock *sk, u32 ack, int icsk_rto_las
 			u32 rtt_tstamp = tp->rcv_tstamp - skb_snd_tstamp;
 
 			if (rtt_tstamp >= get_rtt_tstamp_rto_up()) {
-				ssthresh_dbg("%s rtt %u >= %u, win %u to %u, rto %u to %u, ack=%u",
-					     __func__, rtt_tstamp, get_rtt_tstamp_rto_up(),
+				ssthresh_dbg("rtt %u >= %u, win %u to %u, rto %u to %u, ack=%u",
+					     rtt_tstamp, get_rtt_tstamp_rto_up(),
 					     ntp->nip_ssthresh, get_ssthresh_low_min(),
 					     icsk_rto_last, icsk->icsk_rto, ack);
 
 				ntp->nip_ssthresh = get_ssthresh_low_min();
 			} else if (rtt_tstamp >= get_rtt_tstamp_high()) {
-				ssthresh_dbg("%s rtt %u >= %u, win %u to %u, ack=%u",
-					     __func__, rtt_tstamp, get_rtt_tstamp_high(),
+				ssthresh_dbg("rtt %u >= %u, win %u to %u, ack=%u",
+					     rtt_tstamp, get_rtt_tstamp_high(),
 					     ntp->nip_ssthresh, get_ssthresh_low(), ack);
 
 				ntp->nip_ssthresh = get_ssthresh_low();
 			} else if (rtt_tstamp >= get_rtt_tstamp_mid_high()) {
-				ssthresh_dbg("%s rtt %u >= %u, win %u to %u, ack=%u",
-					     __func__, rtt_tstamp, get_rtt_tstamp_mid_high(),
+				ssthresh_dbg("rtt %u >= %u, win %u to %u, ack=%u",
+					     rtt_tstamp, get_rtt_tstamp_mid_high(),
 					     ntp->nip_ssthresh, get_ssthresh_mid_low(), ack);
 
 				ntp->nip_ssthresh = get_ssthresh_mid_low();
@@ -1112,8 +1119,8 @@ static void tcp_nip_ack_calc_ssthresh(struct sock *sk, u32 ack, int icsk_rto_las
 				nip_ssthresh = (ntp->nip_ssthresh * get_ssthresh_high_step() +
 					       nip_ssthresh) / (get_ssthresh_high_step() + 1);
 
-				ssthresh_dbg("%s rtt %u >= %u, win %u to %u, ack=%u",
-					     __func__, rtt_tstamp, get_rtt_tstamp_mid_low(),
+				ssthresh_dbg("rtt %u >= %u, win %u to %u, ack=%u",
+					     rtt_tstamp, get_rtt_tstamp_mid_low(),
 					     ntp->nip_ssthresh, nip_ssthresh, ack);
 
 				ntp->nip_ssthresh = nip_ssthresh;
@@ -1122,8 +1129,8 @@ static void tcp_nip_ack_calc_ssthresh(struct sock *sk, u32 ack, int icsk_rto_las
 					       get_ssthresh_high()) /
 					       (get_ssthresh_high_step() + 1);
 
-				ssthresh_dbg("%s rtt %u < %u, win %u to %u, ack=%u",
-					     __func__, rtt_tstamp, get_rtt_tstamp_mid_low(),
+				ssthresh_dbg("rtt %u < %u, win %u to %u, ack=%u",
+					     rtt_tstamp, get_rtt_tstamp_mid_low(),
 					     ntp->nip_ssthresh, nip_ssthresh, ack);
 
 				ntp->nip_ssthresh =  nip_ssthresh;
@@ -1155,7 +1162,7 @@ static int tcp_nip_ack(struct sock *sk, const struct sk_buff *skb)
 
 	/* maybe zero window probe */
 	if (!prior_packets) {
-		nip_dbg("%s: no unack pkt, seq=[%u-%u], rcv_nxt=%u, ack=%u", __func__,
+		nip_dbg("no unack pkt, seq=[%u-%u], rcv_nxt=%u, ack=%u",
 			TCP_SKB_CB(skb)->seq, TCP_SKB_CB(skb)->end_seq, tp->rcv_nxt, ack);
 		if (tcp_nip_send_head(sk))
 			tcp_nip_ack_probe(sk);
@@ -1196,7 +1203,7 @@ static inline bool tcp_nip_sequence(const struct tcp_sock *tp, u32 seq, u32 end_
 /* When we get a reset we do this. */
 void tcp_nip_reset(struct sock *sk)
 {
-	nip_dbg("%s: handle RST", __func__);
+	nip_dbg("handle rst");
 
 	/* We want the right error as BSD sees it (and indeed as we do). */
 	switch (sk->sk_state) {
@@ -1232,7 +1239,7 @@ static void tcp_nip_send_dupack(struct sock *sk, const struct sk_buff *skb)
 	    before(TCP_SKB_CB(skb)->seq, tp->rcv_nxt))
 		NET_INC_STATS(sock_net(sk), LINUX_MIB_DELAYEDACKLOST);
 
-	nip_dbg("%s send dup ack", __func__);
+	nip_dbg("send dup ack");
 	tcp_nip_send_ack(sk);
 }
 
@@ -1260,8 +1267,8 @@ static bool tcp_nip_validate_incoming(struct sock *sk, struct sk_buff *skb,
 	 * 02.Enter this branch when the receive window is 0
 	 */
 	if (!tcp_nip_sequence(tp, TCP_SKB_CB(skb)->seq, TCP_SKB_CB(skb)->end_seq)) {
-		nip_dbg("%s receive unexpected pkt, drop it. seq=[%u-%u], rec_win=[%u-%u]",
-			__func__, TCP_SKB_CB(skb)->seq, TCP_SKB_CB(skb)->end_seq,
+		nip_dbg("receive unexpected pkt, drop it. seq=[%u-%u], rec_win=[%u-%u]",
+			TCP_SKB_CB(skb)->seq, TCP_SKB_CB(skb)->end_seq,
 			tp->rcv_wup, tp->rcv_nxt + tcp_receive_window(tp));
 		if (!th->rst)
 			tcp_nip_send_dupack(sk, skb);
@@ -1539,7 +1546,7 @@ int tcp_nip_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 		}
 		goto discard;
 	case TCP_SYN_SENT:
-		nip_dbg("%s TCP_SYN_SENT", __func__);
+		nip_dbg("TCP_SYN_SENT");
 		tp->rx_opt.saw_tstamp = 0;
 		tcp_mstamp_refresh(tp);
 		queued = tcp_nip_rcv_synsent_state_process(sk, skb, th);
@@ -1588,7 +1595,7 @@ int tcp_nip_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 		break;
 	case TCP_FIN_WAIT1: {
 		if (tp->snd_una != tp->write_seq) {
-			nip_dbg("%s: tp->snd_una != tp->write_seq", __func__);
+			nip_dbg("tp->snd_una != tp->write_seq");
 			break;
 		}
 
@@ -1598,12 +1605,11 @@ int tcp_nip_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 		if (TCP_SKB_CB(skb)->end_seq != TCP_SKB_CB(skb)->seq &&
 		    after(TCP_SKB_CB(skb)->end_seq - th->fin, tp->rcv_nxt)) {
 			tcp_nip_done(sk);
-			nip_dbg("%s: received payload packets, call tcp_nip_done", __func__);
+			nip_dbg("received payload packets, call tcp_nip_done");
 			return 1;
 		}
 
-		nip_dbg("%s: TCP_FIN_WAIT1: recvd ack for fin.Wait for fin from other side",
-			__func__);
+		nip_dbg("TCP_FIN_WAIT1: recvd ack for fin.Wait for fin from other side");
 		inet_csk_reset_keepalive_timer(sk, TCP_NIP_CSK_KEEPALIVE_CYCLE * HZ);
 
 		break;
@@ -1611,7 +1617,7 @@ int tcp_nip_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 
 	case TCP_CLOSING:
 		if (tp->snd_una == tp->write_seq) {
-			nip_dbg("%s: TCP_CLOSING: recvd ack for fin.Ready to destroy", __func__);
+			nip_dbg("TCP_CLOSING: recvd ack for fin.Ready to destroy");
 			inet_csk_reset_keepalive_timer(sk, TCP_TIMEWAIT_LEN);
 			goto discard;
 		}
@@ -1619,7 +1625,7 @@ int tcp_nip_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 	case TCP_LAST_ACK:
 		nip_dbg("tcp_nip_rcv_state_process_2: TCP_LAST_ACK");
 		if (tp->snd_una == tp->write_seq) {
-			nip_dbg("%s: LAST_ACK: recvd ack for fin.Directly destroy", __func__);
+			nip_dbg("LAST_ACK: recvd ack for fin.Directly destroy");
 			tcp_nip_done(sk);
 			goto discard;
 		}
@@ -1628,14 +1634,14 @@ int tcp_nip_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 
 	switch (sk->sk_state) {
 	case TCP_CLOSE_WAIT:
-		nip_dbg("%s: into TCP_CLOSE_WAIT, rst = %d, seq = %u, end_seq = %u, rcv_nxt = %u",
-			__func__, th->rst, TCP_SKB_CB(skb)->seq,
+		nip_dbg("into TCP_CLOSE_WAIT, rst = %d, seq = %u, end_seq = %u, rcv_nxt = %u",
+			th->rst, TCP_SKB_CB(skb)->seq,
 			TCP_SKB_CB(skb)->seq, tp->rcv_nxt);
 		fallthrough;
 	case TCP_CLOSING:
 	case TCP_LAST_ACK:
 		if (!before(TCP_SKB_CB(skb)->seq, tp->rcv_nxt)) {
-			nip_dbg("%s: break in TCP_LAST_ACK", __func__);
+			nip_dbg("break in TCP_LAST_ACK");
 			break;
 		}
 		nip_dbg("tcp_nip_rcv_state_process_3: TCP_LAST_ACK_2");
@@ -1649,7 +1655,7 @@ int tcp_nip_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 			if (TCP_SKB_CB(skb)->end_seq != TCP_SKB_CB(skb)->seq &&
 			    after(TCP_SKB_CB(skb)->end_seq - th->fin, tp->rcv_nxt)) {
 				tcp_nip_reset(sk);
-				nip_dbg("%s: call tcp_nip_reset", __func__);
+				nip_dbg("call tcp_nip_reset");
 				return 1;
 			}
 		}
@@ -1723,26 +1729,25 @@ struct sock *tcp_nip_check_req(struct sock *sk, struct sk_buff *skb,
 	if ((flg & TCP_FLAG_ACK) &&
 	    (TCP_SKB_CB(skb)->ack_seq !=
 	     tcp_rsk(req)->snt_isn + 1)) {
-		nip_dbg("%s ack_seq is wrong", __func__);
+		nip_dbg("ack_seq is wrong");
 		return sk;
 	}
 
 	/* The above process guarantees that there is an ACK, if not, return directly */
 	if (!(flg & TCP_FLAG_ACK)) {
-		nip_dbg("%s No TCP_FLAG_ACK", __func__);
+		nip_dbg("No TCP_FLAG_ACK");
 		return NULL;
 	}
 
 	/* The ack is valid and the child control block is created.
 	 * Note that the state of the child control block is TCP_SYN_RECV
 	 */
-	child = inet_csk(sk)->icsk_af_ops->syn_recv_sock(sk, skb, req, NULL,
-							 req, &own_req);
+	child = inet_csk(sk)->icsk_af_ops->syn_recv_sock(sk, skb, req, NULL, req, &own_req);
 	if (!child) {
-		nip_dbg("%s No listen_overflow", __func__);
+		nip_dbg("No listen_overflow");
 		goto listen_overflow;
 	}
-	nip_dbg("%s creat child sock successfully", __func__);
+	nip_dbg("creat child sock successfully");
 
 	sock_rps_save_rxhash(child, skb);
 	/* Calculate the time spent synack-ack in three handshakes */

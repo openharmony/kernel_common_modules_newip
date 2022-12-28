@@ -11,4 +11,4 @@
 int ninet_hooks_register(void);
 #endif
 
-#endif	/* _NIP_HOOKS_REGISTER_H */
+#endif /* _NIP_HOOKS_REGISTER_H */

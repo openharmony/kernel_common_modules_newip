@@ -126,6 +126,4 @@ int nip_getsockopt(struct sock *sk, int level,
 /* functions defined in nip_addrconf.c */
 int nip_addrconf_get_ifaddr(struct net *net, unsigned int cmd, void __user *arg);
 
-void nip_dbg(const char *fmt, ...);
-
 #endif

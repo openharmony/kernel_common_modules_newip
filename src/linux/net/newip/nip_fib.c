@@ -7,7 +7,7 @@
  *
  * Based on net/ipv6/ip6_fib.c
  */
-#define pr_fmt(fmt) "NIP: " fmt
+#define pr_fmt(fmt) KBUILD_MODNAME ": [%s:%d] " fmt, __func__, __LINE__
 
 #include <linux/errno.h>
 #include <linux/types.h>
@@ -23,6 +23,7 @@
 
 #include <net/nip_fib.h>
 #include <net/nip_route.h>
+#include "tcp_nip_parameter.h"
 
 static struct kmem_cache *nip_fib_node_kmem __read_mostly;
 
@@ -124,7 +125,7 @@ int nip_fib_add(struct hlist_head *nip_tb_head, struct nip_rt_info *rt)
 
 	new_node = nip_node_alloc();
 	if (!new_node) {
-		nip_dbg("%s: fail to alloc mem", __func__);
+		nip_dbg("fail to alloc mem");
 		err = -ENOMEM;
 		goto fail;
 	}
@@ -201,8 +202,7 @@ static void nip_fib_clean_hash(struct net *net, struct hlist_head *nip_tb_head,
 				nip_addr_to_str(&fn->nip_route_info->gateway, gateway,
 						NIP_ADDR_BIT_LEN_MAX);
 
-				nip_dbg("%s: try to del rt_info, rt_dst=%s, gateway=%s",
-					__func__, dst, gateway);
+				nip_dbg("try to del rt_info, rt_dst=%s, gateway=%s", dst, gateway);
 				nip_fib_del(fn->nip_route_info, &info);
 			}
 		}

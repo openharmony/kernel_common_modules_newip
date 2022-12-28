@@ -7,7 +7,7 @@
  *
  * Based on net/ipv6/addrconf.c
  */
-#define pr_fmt(fmt) "NIP: " fmt
+#define pr_fmt(fmt) KBUILD_MODNAME ": [%s:%d] " fmt, __func__, __LINE__
 
 #include <linux/errno.h>
 #include <linux/types.h>
@@ -40,6 +40,7 @@
 #include <linux/export.h>
 
 #include "nip_hdr.h"
+#include "tcp_nip_parameter.h"
 
 #define	INFINITY_LIFE_TIME	0xFFFFFFFF
 
@@ -104,7 +105,7 @@ static struct ninet_ifaddr *nip_add_addr(struct ninet_dev *idev,
 
 	/* Do not configure two same addresses in a netdevice */
 	if (nip_chk_same_addr(dev_net(idev->dev), addr, idev->dev)) {
-		nip_dbg("%s: already assigned", __func__);
+		nip_dbg("already assigned");
 		err = -EEXIST;
 		goto spin_lock_out;
 	}
@@ -158,7 +159,7 @@ rcu_lock_out:
 	rcu_read_unlock_bh();
 
 	if (likely(err == 0)) {
-		nip_dbg("%s: success, idev->refcnt=%u", __func__, refcount_read(&idev->refcnt));
+		nip_dbg("success, idev->refcnt=%u", refcount_read(&idev->refcnt));
 	} else {
 		kfree(ifa);
 		nin_dev_put(idev);
@@ -202,7 +203,7 @@ static struct ninet_dev *nip_add_dev(struct net_device *dev)
 
 	refcount_set(&ndev->refcnt, 1);
 
-	nip_dbg("%s: init ninet_dev success, set ndev->refcnt=1", __func__);
+	nip_dbg("init ninet_dev success, set ndev->refcnt=1");
 
 	if (netif_running(dev) && nip_addrconf_link_ready(dev))
 		ndev->if_flags |= IF_READY;
@@ -288,7 +289,7 @@ static int ninet_addr_add(struct net *net, int ifindex,
 	if (!IS_ERR(ifp)) {
 		nin_ifa_put(ifp);
 		nip_ins_rt(ifp->rt);
-		nip_dbg("%s: success, ifp->refcnt=%u", __func__, refcount_read(&ifp->refcnt));
+		nip_dbg("success, ifp->refcnt=%u", refcount_read(&ifp->refcnt));
 		return 0;
 	}
 
@@ -300,13 +301,9 @@ void ninet_ifa_finish_destroy(struct ninet_ifaddr *ifp)
 {
 	WARN_ON(!hlist_unhashed(&ifp->addr_lst));
 
-	nip_dbg("%s: before idev put. idev->refcnt=%u", __func__,
-		refcount_read(&ifp->idev->refcnt));
-
+	nip_dbg("before idev put. idev->refcnt=%u", refcount_read(&ifp->idev->refcnt));
 	nin_dev_put(ifp->idev);
-
 	nip_rt_put(ifp->rt);
-
 	kfree_rcu(ifp, rcu);
 }
 
@@ -380,22 +377,22 @@ static int ninet_addr_del(struct net *net, int ifindex, u32 ifa_flags,
 int nip_addrconf_ifaddr_check(struct net *net, void __user *arg, struct nip_ifreq *ireq)
 {
 	if (!ns_capable(net->user_ns, CAP_NET_ADMIN)) {
-		nip_dbg("%s: not admin can`t cfg", __func__);
+		nip_dbg("not admin can`t cfg");
 		return -EPERM;
 	}
 
 	if (copy_from_user(ireq, arg, sizeof(struct nip_ifreq))) {
-		nip_dbg("%s: fail to copy cfg data", __func__);
+		nip_dbg("fail to copy cfg data");
 		return -EFAULT;
 	}
 
 	if (nip_addr_invalid(&ireq->ifrn_addr)) {
-		nip_dbg("%s: nip addr invalid, bitlen=%u", __func__, ireq->ifrn_addr.bitlen);
+		nip_dbg("nip addr invalid, bitlen=%u", ireq->ifrn_addr.bitlen);
 		return -EFAULT;
 	}
 
 	if (nip_addr_public(&ireq->ifrn_addr)) {
-		nip_dbg("%s: The public address cannot be configured", __func__);
+		nip_dbg("The public address cannot be configured");
 		return -EFAULT;
 	}
 	return 0;
@@ -408,7 +405,7 @@ int nip_addrconf_add_ifaddr(struct net *net, void __user *arg)
 
 	err = nip_addrconf_ifaddr_check(net, arg, &ireq);
 	if (err < 0) {
-		nip_dbg("%s: The ifaddr check failed", __func__);
+		nip_dbg("The ifaddr check failed");
 		return err;
 	}
 
@@ -427,7 +424,7 @@ int nip_addrconf_del_ifaddr(struct net *net, void __user *arg)
 
 	err = nip_addrconf_ifaddr_check(net, arg, &ireq);
 	if (err < 0) {
-		nip_dbg("%s: The ifaddr check failed", __func__);
+		nip_dbg("The ifaddr check failed");
 		return err;
 	}
 
@@ -604,8 +601,8 @@ static int nip_addrconf_ifdown(struct net_device *dev, bool unregister)
 
 	ASSERT_RTNL();
 
-	nip_dbg("%s: %s ifindex=%u, unregister=%u (unregister:1, down:0)",
-		__func__, dev->name, dev->ifindex, unregister);
+	nip_dbg("%s ifindex=%u, unregister=%u (unregister:1, down:0)",
+		dev->name, dev->ifindex, unregister);
 
 	nip_rt_ifdown(net, dev);
 	neigh_ifdown(&nnd_tbl, dev);
@@ -632,7 +629,7 @@ static int nip_addrconf_ifdown(struct net_device *dev, bool unregister)
 				char addr[NIP_ADDR_BIT_LEN_MAX] = {0};
 
 				nip_addr_to_str(&ifa->addr, addr, NIP_ADDR_BIT_LEN_MAX);
-				nip_dbg("%s: clear addr hash table.(addr=%s)", __func__, addr);
+				nip_dbg("clear addr hash table.(addr=%s)", addr);
 				hlist_del_init_rcu(&ifa->addr_lst);
 			}
 		}
@@ -671,7 +668,7 @@ static int nip_addrconf_ifdown(struct net_device *dev, bool unregister)
 	if (unregister) {
 		neigh_parms_release(&nnd_tbl, idev->nd_parms);
 		neigh_ifdown(&nnd_tbl, dev);
-		nip_dbg("%s: %s (ifindex=%u) before idev put. idev->refcnt=%u", __func__,
+		nip_dbg("%s (ifindex=%u) before idev put. idev->refcnt=%u",
 			dev->name, dev->ifindex, refcount_read(&idev->refcnt));
 		nin_dev_put(idev);
 	}
@@ -749,7 +746,7 @@ int __init nip_addrconf_init(void)
 
 	err = register_pernet_subsys(&nip_route_proc_net_ops);
 	if (err < 0) {
-		nip_dbg("%s: register_pernet_subsys failed", __func__);
+		nip_dbg("register_pernet_subsys failed");
 		goto out;
 	}
 
@@ -812,7 +809,7 @@ int nip_addrconf_get_ifaddr(struct net *net, unsigned int cmd, void __user *arg)
 	ifr.nip_ifr_name[IFNAMSIZ - 1] = 0;
 	snin = (struct sockaddr_nin *)&ifr.nip_dev_addr;
 
-	nip_dbg("%s, dev name is %s", __func__, ifr.nip_ifr_name);
+	nip_dbg("dev name is %s", ifr.nip_ifr_name);
 	dev_load(net, ifr.nip_ifr_name);
 
 	if (cmd == SIOCGIFADDR) {
