@@ -7,7 +7,7 @@
  *
  * Based on  linux/net/ipv6/af_inet6.c
  */
-#define pr_fmt(fmt) "NIP: " fmt
+#define pr_fmt(fmt) KBUILD_MODNAME ": [%s:%d] " fmt, __func__, __LINE__
 
 #include <linux/module.h>
 #include <linux/capability.h>
@@ -50,6 +50,7 @@
 #include <trace/hooks/nip_hooks.h>
 #include "nip_hooks_register.h"
 #endif
+#include "tcp_nip_parameter.h"
 
 MODULE_DESCRIPTION("NewIP protocol stack");
 
@@ -89,7 +90,7 @@ static int ninet_create(struct net *net, struct socket *sock, int protocol,
 
 	num = atomic_add_return(1, &g_nip_socket_number);
 	if (num > NIP_MAX_SOCKET_NUM) {
-		nip_dbg("The number of socket is biger than 1024");
+		nip_dbg("The number of socket is biger than %u", NIP_MAX_SOCKET_NUM);
 		err = -EPERM;
 		goto number_sub;
 	}
@@ -210,7 +211,7 @@ int ninet_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 		return -EACCES;
 
 	if (nip_bind_addr_check(net, &addr->sin_addr) == false) {
-		nip_dbg("%s: binding-addr invalid, bitlen=%u", __func__, addr->sin_addr.bitlen);
+		nip_dbg("binding-addr invalid, bitlen=%u", addr->sin_addr.bitlen);
 		return -EADDRNOTAVAIL;
 	}
 	lock_sock(sk);
@@ -426,14 +427,14 @@ int ninet_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 	struct sock *sk = sock->sk;
 	struct net *net = sock_net(sk);
 
-	nip_dbg("%s: cmd=0x%x", __func__, cmd);
+	nip_dbg("cmd=0x%x", cmd);
 	switch (cmd) {
 	case SIOCADDRT:
 	case SIOCDELRT: {
 		struct nip_rtmsg rtmsg;
 
 		if (copy_from_user(&rtmsg, (void __user *)arg, sizeof(rtmsg))) {
-			nip_dbg("%s: fail to copy route cfg data", __func__);
+			nip_dbg("fail to copy route cfg data");
 			return -EFAULT;
 		}
 		return nip_route_ioctl(net, cmd, &rtmsg);
@@ -447,7 +448,7 @@ int ninet_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 
 	default:
 		if (!sk->sk_prot->ioctl) {
-			nip_dbg("%s: sock sk_prot ioctl is null, cmd=0x%x", __func__, cmd);
+			nip_dbg("sock sk_prot ioctl is null, cmd=0x%x", cmd);
 			return -ENOIOCTLCMD;
 		}
 		return sk->sk_prot->ioctl(sk, cmd, arg);
@@ -479,11 +480,11 @@ static int ninet_compat_routing_ioctl(struct sock *sk, unsigned int cmd,
 	    get_user(rt.rtmsg_metric, &ur->rtmsg_metric) ||
 	    get_user(rt.rtmsg_info, &ur->rtmsg_info) ||
 	    get_user(rt.rtmsg_flags, &ur->rtmsg_flags)) {
-		nip_dbg("%s: fail to convert input para, cmd=0x%x", __func__, cmd);
+		nip_dbg("fail to convert input para, cmd=0x%x", cmd);
 		return -EFAULT;
 	}
 
-	nip_dbg("%s: cmd=0x%x", __func__, cmd);
+	nip_dbg("cmd=0x%x", cmd);
 	return nip_route_ioctl(sock_net(sk), cmd, &rt);
 }
 
@@ -740,7 +741,7 @@ static int __init ninet_init(void)
 		goto nip_packet_fail;
 	}
 #endif
-	nip_dbg("NewIP: init newip address family ok");
+	nip_dbg("init newip address family ok");
 
 out:
 	return err;

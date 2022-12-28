@@ -9,6 +9,8 @@
  *
  * Definitions for the NewIP parameter module.
  */
+#define pr_fmt(fmt) KBUILD_MODNAME ": [%s:%d] " fmt, __func__, __LINE__
+
 #include <net/dst.h>
 #include <net/tcp.h>
 #include <net/tcp_nip.h>

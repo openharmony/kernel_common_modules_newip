@@ -7,7 +7,7 @@
  *
  * Based on net/ipv6/ndisc.c
  */
-#define pr_fmt(fmt) "NIP-ND: " fmt
+#define pr_fmt(fmt) KBUILD_MODNAME ": [%s:%d] " fmt, __func__, __LINE__
 
 #include <linux/module.h>
 #include <linux/errno.h>
@@ -38,6 +38,7 @@
 #include <linux/netfilter.h>
 #include "nip_hdr.h"
 #include "nip_checksum.h"
+#include "tcp_nip_parameter.h"
 
 /* NUD_INCOMPLETE
  * The neighbor request packet has been sent but no response has been received
@@ -357,7 +358,7 @@ static void nndisc_send_ns(struct net_device *dev,
 
 	ret = nndisc_send_skb(dev, skb, &head, payload_len);
 	if (ret)
-		nip_dbg("%s: dst output fail", __func__);
+		nip_dbg("dst output fail");
 }
 
 static void nndisc_solicit(struct neighbour *neigh, struct sk_buff *skb)
@@ -386,7 +387,7 @@ static void nndisc_solicit(struct neighbour *neigh, struct sk_buff *skb)
 		}
 		read_unlock_bh(&idev->lock);
 	} else {
-		nip_dbg("%s:idev don't exist", __func__);
+		nip_dbg("idev don't exist");
 	}
 	rcu_read_unlock();
 }
@@ -439,7 +440,7 @@ static void nndisc_send_na(struct net_device *dev,
 
 	ret = nndisc_send_skb(dev, skb, &head, payload_len);
 	if (ret)
-		nip_dbg("%s: dst output fail", __func__);
+		nip_dbg("dst output fail");
 }
 
 bool nip_addr_local(struct net_device *dev, struct nip_addr *addr)
@@ -488,7 +489,7 @@ int nndisc_rcv_ns(struct sk_buff *skb)
 	}
 
 	if (nip_addr_invalid(&addr)) {
-		nip_dbg("%s: icmp hdr addr invalid, bitlen=%u", __func__, addr.bitlen);
+		nip_dbg("icmp hdr addr invalid, bitlen=%u", addr.bitlen);
 		err = -EFAULT;
 		goto out;
 	}
@@ -503,7 +504,7 @@ int nndisc_rcv_ns(struct sk_buff *skb)
 
 	/* checksum parse */
 	if (!nip_get_nndisc_rcv_checksum(skb, p)) {
-		nip_dbg("%s:ns ICMP checksum failed, drop the packet", __func__);
+		nip_dbg("ns ICMP checksum failed, drop the packet");
 		err = -EINVAL;
 		goto out;
 	}
@@ -535,7 +536,7 @@ int nndisc_rcv_na(struct sk_buff *skb)
 	memcpy(lladdr, p, len);
 
 	if (!nip_get_nndisc_rcv_checksum(skb, p + len)) {
-		nip_dbg("%s:na ICMP checksum failed, drop the packet", __func__);
+		nip_dbg("na ICMP checksum failed, drop the packet");
 		kfree_skb(skb);
 		return 0;
 	}

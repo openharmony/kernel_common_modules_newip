@@ -110,21 +110,6 @@ void tcp_nip_clear_xmit_timers(struct sock *sk);
 void tcp_nip_delack_timer_handler(struct sock *sk);
 void tcp_nip_write_timer_handler(struct sock *sk);
 
-/* check probe0 timer */
-static inline void tcp_nip_check_probe_timer(struct sock *sk)
-{
-	unsigned long when;
-
-	if (!tcp_sk(sk)->packets_out && !inet_csk(sk)->icsk_pending) {
-		when = tcp_probe0_base(sk);
-		nip_dbg("%s start probe0 timer, when=%u, RTO MAX=%u", __func__, when, TCP_RTO_MAX);
-		inet_csk_reset_xmit_timer(sk, ICSK_TIME_PROBE0, when, TCP_RTO_MAX);
-	} else if (inet_csk(sk)->icsk_pending != ICSK_TIME_PROBE0) {
-		nip_dbg("%s can`t start probe0 timer, packets_out=%u, icsk_pending=%u",
-			__func__, tcp_sk(sk)->packets_out, inet_csk(sk)->icsk_pending);
-	}
-}
-
 static inline struct sk_buff *tcp_nip_send_head(const struct sock *sk)
 {
 	return sk->sk_send_head;
@@ -151,6 +136,7 @@ static inline void tcp_nip_write_queue_purge(struct sock *sk)
 
 	tcp_clear_all_retrans_hints(tcp_sk(sk));
 	sk->sk_send_head = NULL;
+	tcp_sk(sk)->packets_out = 0;
 	inet_csk(sk)->icsk_backoff = 0;
 }
 

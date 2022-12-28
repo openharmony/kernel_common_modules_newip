@@ -7,7 +7,7 @@
  *
  * Based on net/ipv6/ip6_input.c
  */
-#define pr_fmt(fmt) "NIP-INPUT: " fmt
+#define pr_fmt(fmt) KBUILD_MODNAME ": [%s:%d] " fmt, __func__, __LINE__
 
 #include <linux/errno.h>
 #include <linux/types.h>
@@ -24,6 +24,7 @@
 #include <net/nip.h>
 
 #include "nip_hdr.h"
+#include "tcp_nip_parameter.h"
 
 static int _nip_update_recv_skb_len(struct sk_buff *skb,
 				    struct nip_hdr_decap *niph)
@@ -32,8 +33,8 @@ static int _nip_update_recv_skb_len(struct sk_buff *skb,
 		return 0;
 
 	if (niph->total_len > skb->len) {
-		nip_dbg("%s: total_len(%u) is bigger than skb_len(%u), Drop a packet",
-			__func__, niph->total_len, skb->len);
+		nip_dbg("total_len(%u) is bigger than skb_len(%u), Drop a packet",
+			niph->total_len, skb->len);
 		return NET_RX_DROP;
 	}
 
@@ -52,7 +53,7 @@ static int nip_rcv_finish(struct sk_buff *skb)
 	if (net->ipv4.sysctl_ip_early_demux && !skb_dst(skb) && !skb->sk) {
 		const struct ninet_protocol *ipprot;
 
-		nip_dbg("%s: try to early demux skb, nexthdr=0x%x", __func__, NIPCB(skb)->nexthdr);
+		nip_dbg("try to early demux skb, nexthdr=0x%x", NIPCB(skb)->nexthdr);
 		ipprot = rcu_dereference(ninet_protos[NIPCB(skb)->nexthdr]);
 		if (ipprot)
 			edemux = READ_ONCE(ipprot->early_demux);
@@ -87,14 +88,14 @@ int nip_rcv(struct sk_buff *skb, struct net_device *dev,
 	memset(NIPCB(skb), 0, sizeof(struct ninet_skb_parm));
 	offset = nip_hdr_parse(skb->data, skb->len, &niph);
 	if (offset <= 0) {
-		nip_dbg("%s check in failure, errcode=%d, Drop a packet (nexthdr=%u, hdr_len=%u)",
-			__func__, offset, niph.nexthdr, niph.hdr_len);
+		nip_dbg("check in failure, errcode=%d, Drop a packet (nexthdr=%u, hdr_len=%u)",
+			offset, niph.nexthdr, niph.hdr_len);
 		goto drop;
 	}
 
 	if (niph.nexthdr != IPPROTO_UDP && niph.nexthdr != IPPROTO_TCP &&
 	    niph.nexthdr != IPPROTO_NIP_ICMP) {
-		nip_dbg("%s nexthdr(%u) invalid, Drop a packet", __func__, niph.nexthdr);
+		nip_dbg("nexthdr(%u) invalid, Drop a packet", niph.nexthdr);
 		goto drop;
 	}
 

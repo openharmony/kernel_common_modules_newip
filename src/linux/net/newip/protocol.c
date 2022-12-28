@@ -10,12 +10,13 @@
  *
  * Based on net/ipv6/protocol.c
  */
-#define pr_fmt(fmt) "NIP: " fmt
+#define pr_fmt(fmt) KBUILD_MODNAME ": [%s:%d] " fmt, __func__, __LINE__
 
 #include <net/protocol.h>
 #include <linux/module.h>
 #include <linux/netdevice.h>
 #include <linux/spinlock.h>
+#include "tcp_nip_parameter.h"
 
 const struct ninet_protocol __rcu *ninet_protos[MAX_INET_PROTOS] __read_mostly;
 

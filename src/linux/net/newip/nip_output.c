@@ -7,7 +7,7 @@
  *
  * Based on net/ipv6/ip6_output.c
  */
-#define pr_fmt(fmt) "NIP-OUTPUT: " fmt
+#define pr_fmt(fmt) KBUILD_MODNAME ": [%s:%d] " fmt, __func__, __LINE__
 
 #include <linux/errno.h>
 #include <linux/kernel.h>
@@ -33,6 +33,7 @@
 
 #include "nip_hdr.h"
 #include "nip_checksum.h"
+#include "tcp_nip_parameter.h"
 
 #define NIP_BIT_TO_BYTE 1024
 void update_memory_rate(const char *upper_fun)
@@ -48,7 +49,7 @@ void update_memory_rate(const char *upper_fun)
 	total = (unsigned long)mem_info.totalram * uint_kb;
 	free = (unsigned long)mem_info.freeram * uint_kb;
 	used = total - free;
-	nip_dbg("%s -> %s mem total: %ld KB, mem used: %ld KB", upper_fun, __func__, total, used);
+	nip_dbg("%s call cur-func mem total: %ld KB, mem used: %ld KB", upper_fun, total, used);
 }
 
 int nip_output(struct net *net, struct sock *sk, struct sk_buff *skb)
@@ -106,7 +107,7 @@ int nip_send_skb(struct sk_buff *skb)
 	if (err) {
 		if (err > 0)
 			err = net_xmit_errno(err);
-		nip_dbg("%s: failed to out skb, err = %d", __func__, err);
+		nip_dbg("failed to out skb, err = %d", err);
 	}
 
 	return err;
@@ -139,7 +140,7 @@ static struct sk_buff *_nip_alloc_skb(struct sock *sk,
 	len = NIP_ETH_HDR_LEN + nip_hdr_len + head->trans_hdr_len + seg_info->mid_usr_pkt_len;
 	skb = alloc_skb(len, 0);
 	if (!skb) {
-		nip_dbg("%s: no space for skb", __func__);
+		nip_dbg("no space for skb");
 		return NULL;
 	}
 
@@ -149,8 +150,7 @@ static struct sk_buff *_nip_alloc_skb(struct sock *sk,
 	skb->sk = sk;
 
 	dst_hold(dst);
-	nip_dbg("%s: malloc_len=%d, dst->__refcnt=%u", __func__,
-		len, atomic_read(&dst->__refcnt));
+	nip_dbg("malloc_len=%d, dst->__refcnt=%u", len, atomic_read(&dst->__refcnt));
 	skb_dst_set(skb, dst);
 	memset(NIPCB(skb), 0, sizeof(struct ninet_skb_parm));
 
@@ -169,7 +169,7 @@ static int _nip_udp_single_output(struct sock *sk,
 	unsigned short check = 0;
 
 	if (IS_ERR_OR_NULL(skb)) {
-		nip_dbg("%s: skb alloc fail", __func__);
+		nip_dbg("skb alloc fail");
 		return -ENOMEM;
 	}
 
@@ -198,7 +198,7 @@ static int _nip_udp_single_output(struct sock *sk,
 		/* The DST has been set to the SKB. When the SKB is released,
 		 * the DST is automatically released
 		 */
-		nip_dbg("%s: copy from iter fail (datalen=%u)", __func__, head->usr_data_len);
+		nip_dbg("copy from iter fail (datalen=%u)", head->usr_data_len);
 		kfree_skb(skb);
 		return -EFBIG;
 	}
@@ -224,7 +224,7 @@ static int _nip_udp_single_output(struct sock *sk,
 	skb->priority = sk->sk_priority;
 
 	ret = nip_send_skb(skb);
-	nip_dbg("%s: newip output finish (ret=%d, datalen=%u)", __func__, ret, head->usr_data_len);
+	nip_dbg("output finish (ret=%d, datalen=%u)", ret, head->usr_data_len);
 	update_memory_rate(__func__);
 	return ret;
 }
@@ -302,7 +302,7 @@ static int nip_dst_lookup_tail(struct net *net, const struct sock *sk,
 	err = (*dst)->error;
 	if (err) {
 		rt = NULL;
-		nip_dbg("%s: nip_route_output search error", __func__);
+		nip_dbg("route output search error");
 		goto out_err_release;
 	}
 
@@ -387,13 +387,13 @@ int tcp_nip_queue_xmit(struct sock *sk, struct sk_buff *skb, struct flowi *fl)
 	fln.daddr = sk->sk_nip_daddr;
 	dst = __sk_dst_check(sk, 0);
 	if (!dst) {
-		nip_dbg("%s: no dst cache for sk, search newip rt", __func__);
+		nip_dbg("no dst cache for sk, search newip rt");
 		dst = nip_route_output(net, sk, &fln);
 		err = dst->error;
 		if (err)
 			goto out_err_release;
 		if (!dst) {
-			nip_dbg("%s: cannot find dst", __func__);
+			nip_dbg("cannot find dst");
 			goto out;
 		}
 		sk_dst_set(sk, dst);
@@ -413,9 +413,9 @@ int tcp_nip_queue_xmit(struct sock *sk, struct sk_buff *skb, struct flowi *fl)
 	head.total_len = skb->len;
 	err = nip_send_skb(skb);
 	if (err)
-		nip_dbg("%s: failed to send skb, skb->len=%u", __func__, head.total_len);
+		nip_dbg("failed to send skb, skb->len=%u", head.total_len);
 	else
-		nip_dbg("%s: send skb ok, skb->len=%u", __func__, head.total_len);
+		nip_dbg("send skb ok, skb->len=%u", head.total_len);
 
 out:
 	rcu_read_unlock();
@@ -474,10 +474,10 @@ void tcp_nip_actual_send_reset(struct sock *sk, struct sk_buff *skb, u32 seq,
 	t1->rst = rst;
 	t1->window = htons(win);
 	t1->check = htons(nip_get_output_checksum_tcp(buff, *saddr, *daddr));
-	nip_dbg("%s: host dport=%u, net dport=0x%x, host sport=%u, net sport=0x%x",
-		__func__, ntohs(t1->dest), t1->dest, ntohs(t1->source), t1->source);
-	nip_dbg("%s: host seq=%u, net seq=0x%x, host ack_seq=%u, net ack_seq=0x%x",
-		__func__, seq, t1->seq, ack_seq, t1->ack_seq);
+	nip_dbg("host dport=%u, net dport=0x%x, host sport=%u, net sport=0x%x",
+		ntohs(t1->dest), t1->dest, ntohs(t1->source), t1->source);
+	nip_dbg("host seq=%u, net seq=0x%x, host ack_seq=%u, net ack_seq=0x%x",
+		seq, t1->seq, ack_seq, t1->ack_seq);
 
 	buff->protocol = htons(ETH_P_NEWIP);
 	buff->ip_summed = CHECKSUM_NONE;
@@ -497,7 +497,7 @@ void tcp_nip_actual_send_reset(struct sock *sk, struct sk_buff *skb, u32 seq,
 	fln.daddr = *daddr;
 	dst = nip_route_output(net, sk, &fln); // here, sk not used.
 	if (!dst) {
-		nip_dbg("%s: cannot find dst", __func__);
+		nip_dbg("cannot find dst");
 		goto out;
 	}
 	skb_dst_set_noref(buff, dst);
@@ -515,9 +515,9 @@ void tcp_nip_actual_send_reset(struct sock *sk, struct sk_buff *skb, u32 seq,
 	head.total_len = buff->len;
 	err = nip_send_skb(buff);
 	if (err)
-		nip_dbg("%s: failed to send skb, skb->len=%u", __func__, head.total_len);
+		nip_dbg("failed to send skb, skb->len=%u", head.total_len);
 	else
-		nip_dbg("%s: send skb ok, skb->len=%u", __func__, head.total_len);
+		nip_dbg("send skb ok, skb->len=%u", head.total_len);
 
 out:
 	return;

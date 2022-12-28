@@ -124,4 +124,4 @@ enum nip_index {
 	INDEX_MAX,
 };
 
-#endif /*_NIP_H */
+#endif /* _NIP_H */

@@ -33,7 +33,7 @@ struct sockaddr_nin {
 };
 
 struct nip_devreq {
-	char	nip_ifr_name[IFNAMSIZ];	/* if name, e.g. "eth0", "wlan0" */
+	char	nip_ifr_name[IFNAMSIZ]; /* if name, e.g. "eth0", "wlan0" */
 
 	union {
 		struct sockaddr_nin addr;
@@ -44,4 +44,4 @@ struct nip_devreq {
 #define nip_dev_addr devreq.addr    /* nip address */
 #define nip_dev_flags devreq.flags  /* net device flags */
 
-#endif /*_UAPI_NEWIP_H */
+#endif /* _UAPI_NEWIP_H */

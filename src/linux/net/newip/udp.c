@@ -12,7 +12,7 @@
  * Based on net/ipv4/udp.c
  * Based on net/ipv6/udp.c
  */
-#define pr_fmt(fmt) "NIP-UDP: " fmt
+#define pr_fmt(fmt) KBUILD_MODNAME ": [%s:%d] " fmt, __func__, __LINE__
 
 #include <linux/uaccess.h>
 #include <linux/errno.h>
@@ -38,6 +38,7 @@
 #include <net/udp.h>
 #include "nip_hdr.h"
 #include "nip_checksum.h"
+#include "tcp_nip_parameter.h"
 
 static u32 nip_udp_portaddr_hash(const struct net *net,
 				 const struct nip_addr *niaddr,
@@ -220,7 +221,7 @@ int nip_udp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 	/* copy data */
 	datalen = copy_to_iter(skb->data, copied, &msg->msg_iter);
 	if (datalen < 0) {
-		nip_dbg("%s: copy to iter in failure, len=%d", __func__, datalen);
+		nip_dbg("copy to iter in failure, len=%d", datalen);
 		err = -EFAULT;
 		return err;
 	}
@@ -292,7 +293,7 @@ int nip_udp_input(struct sk_buff *skb)
 	struct udphdr *udphead = udp_hdr(skb);
 
 	if (!nip_get_udp_input_checksum(skb)) {
-		nip_dbg("%s: checksum failed, drop the packet", __func__);
+		nip_dbg("checksum failed, drop the packet");
 		kfree_skb(skb);
 		rc = -1;
 		goto end;
@@ -301,9 +302,8 @@ int nip_udp_input(struct sk_buff *skb)
 	sk = __nip_udp_lib_lookup_skb(skb, udphead->source,
 				      udphead->dest, &udp_table);
 	if (!sk) {
-		nip_dbg("%s: dport not match, drop the packet. sport=%u, dport=%u, data_len=%u",
-			__func__, ntohs(udphead->source),
-			ntohs(udphead->dest), ntohs(udphead->len));
+		nip_dbg("dport not match, drop the packet. sport=%u, dport=%u, data_len=%u",
+			ntohs(udphead->source), ntohs(udphead->dest), ntohs(udphead->len));
 		kfree_skb(skb);
 		rc = -1;
 		goto end;
@@ -335,11 +335,11 @@ int nip_udp_output(struct sock *sk, struct msghdr *msg, size_t len)
 		return -EDESTADDRREQ;
 
 	if (sin->sin_family != AF_NINET) {
-		nip_dbg("%s: sin_family false", __func__);
+		nip_dbg("sin_family false");
 		return -EAFNOSUPPORT;
 	}
 	if (nip_addr_invalid(&sin->sin_addr)) {
-		nip_dbg("%s: sin_addr false", __func__);
+		nip_dbg("sin_addr false");
 		return -EFAULT;
 	}
 

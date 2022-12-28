@@ -11,7 +11,7 @@
  *
  * Based on net/ipv4/tcp_timer.c
  */
-#define pr_fmt(fmt) "NIP-TCP: " fmt
+#define pr_fmt(fmt) KBUILD_MODNAME ": [%s:%d] " fmt, __func__, __LINE__
 
 #include <net/tcp_nip.h>
 #include <linux/module.h>
@@ -100,7 +100,7 @@ static bool retransmits_nip_timed_out(struct sock *sk,
 	 * Currently, it determines whether the timeout period is based on
 	 * the retransmission times
 	 */
-	nip_dbg("%s: icsk->retransmits=%u, boundary=%u", __func__,
+	nip_dbg("icsk->retransmits=%u, boundary=%u",
 		inet_csk(sk)->icsk_retransmits, boundary);
 	return inet_csk(sk)->icsk_retransmits > boundary;
 }
@@ -127,7 +127,7 @@ static int tcp_nip_write_timeout(struct sock *sk)
 
 	if (retransmits_nip_timed_out(sk, retry_until,
 				      syn_set ? 0 : icsk->icsk_user_timeout, syn_set)) {
-		nip_dbg("%s: tcp retransmit time out", __func__);
+		nip_dbg("tcp retransmit time out");
 		tcp_nip_write_err(sk);
 		return 1;
 	}
@@ -141,6 +141,7 @@ void tcp_nip_retransmit_timer(struct sock *sk)
 	struct inet_connection_sock *icsk = inet_csk(sk);
 	struct sk_buff *skb = tcp_write_queue_head(sk);
 	struct tcp_skb_cb *scb = TCP_SKB_CB(skb);
+	struct net *net = sock_net(sk);
 	u32 icsk_rto_last;
 
 	if (!tp->packets_out)
@@ -161,20 +162,41 @@ void tcp_nip_retransmit_timer(struct sock *sk)
 					  min(icsk->icsk_rto, TCP_RESOURCE_PROBE_INTERVAL),
 					  TCP_RTO_MAX);
 
-		ssthresh_dbg("%s seq %u retransmit fail, win=%u, rto=%u, pkt_out=%u",
-			     __func__, scb->seq, ntp->nip_ssthresh,
-			     icsk->icsk_rto, tp->packets_out);
+		nip_dbg("seq %u retransmit fail, win=%u, rto=%u, pkt_out=%u, icsk_backoff=%u",
+			scb->seq, ntp->nip_ssthresh,
+			icsk->icsk_rto, tp->packets_out, icsk->icsk_backoff);
 		return;
 	}
-	icsk->icsk_backoff++;
+
+	if (icsk->icsk_backoff < net->ipv4.sysctl_tcp_retries2)
+		icsk->icsk_backoff++;
 	icsk->icsk_retransmits++;
 
 	icsk_rto_last = icsk->icsk_rto;
-	icsk->icsk_rto = min(icsk->icsk_rto << 1, TCP_RTO_MAX);
+	/* If stream is thin, use linear timeouts. Since 'icsk_backoff' is
+	 * used to reset timer, set to 0. Recalculate 'icsk_rto' as this
+	 * might be increased if the stream oscillates between thin and thick,
+	 * thus the old value might already be too high compared to the value
+	 * set by 'tcp_set_rto' in tcp_input.c which resets the rto without
+	 * backoff. Limit to TCP_THIN_LINEAR_RETRIES before initiating
+	 * exponential backoff behaviour to avoid continue hammering
+	 * linear-timeout retransmissions into a black hole
+	 */
+	if (sk->sk_state == TCP_ESTABLISHED &&
+	    (tp->thin_lto || net->ipv4.sysctl_tcp_thin_linear_timeouts) &&
+	    tcp_stream_is_thin(tp) &&
+	    icsk->icsk_retransmits <= TCP_THIN_LINEAR_RETRIES) {
+		icsk->icsk_backoff = 0;
+		icsk->icsk_rto = min(__tcp_set_rto(tp), TCP_RTO_MAX);
+	} else {
+		/* Use normal (exponential) backoff */
+		icsk->icsk_rto = min(icsk->icsk_rto << 1, TCP_RTO_MAX);
+	}
 
-	ssthresh_dbg("%s seq %u, reset win %u to %u, rto %u to %u, pkt_out=%u",
-		     __func__, scb->seq, ntp->nip_ssthresh, get_ssthresh_low(),
-		     icsk_rto_last, icsk->icsk_rto, tp->packets_out);
+	nip_dbg("seq %u, win[%u-%u] rto[%u-%u] pkt_out=%u, icsk_backoff=%u, retransmits=%u",
+		scb->seq, ntp->nip_ssthresh, get_ssthresh_low(),
+		icsk_rto_last, icsk->icsk_rto, tp->packets_out, icsk->icsk_backoff,
+		icsk->icsk_retransmits);
 
 	ntp->nip_ssthresh = get_ssthresh_low();
 
@@ -191,9 +213,10 @@ void tcp_nip_probe_timer(struct sock *sk)
 
 	if (tp->packets_out || !tcp_nip_send_head(sk)) {
 		icsk->icsk_probes_out = 0;
-		icsk->icsk_backoff = 0;  // V4 no modified this line
-		nip_dbg("%s packets_out(%u) not 0 or send_head is NULL, cancel probe0 timer",
-			__func__, tp->packets_out);
+		icsk->icsk_probes_tstamp = 0;
+		icsk->icsk_backoff = 0;  /* V4 no modified this line */
+		nip_dbg("packets_out(%u) not 0 or send_head is NULL, cancel probe0 timer",
+			tp->packets_out);
 		return;
 	}
 
@@ -204,11 +227,11 @@ void tcp_nip_probe_timer(struct sock *sk)
 		const bool alive = inet_csk_rto_backoff(icsk, TCP_RTO_MAX) < TCP_RTO_MAX;
 
 		max_probes = tcp_nip_orphan_retries(sk, alive);
-		nip_dbg("%s sock dead, icsk_backoff=%u, max_probes=%u, alive=%u",
-			__func__, icsk->icsk_backoff, max_probes, alive);
+		nip_dbg("sock dead, icsk_backoff=%u, max_probes=%u, alive=%u",
+			icsk->icsk_backoff, max_probes, alive);
 		if (!alive && icsk->icsk_backoff >= max_probes) {
-			nip_dbg("%s will close session, icsk_backoff=%u, max_probes=%u",
-				__func__, icsk->icsk_backoff, max_probes);
+			nip_dbg("will close session, icsk_backoff=%u, max_probes=%u",
+				icsk->icsk_backoff, max_probes);
 			goto abort;
 		}
 	}
@@ -216,14 +239,14 @@ void tcp_nip_probe_timer(struct sock *sk)
 	if (icsk->icsk_probes_out >= max_probes) {
 abort:		icsk_backoff = icsk->icsk_backoff;
 		icsk_probes_out = icsk->icsk_probes_out;
-		nip_dbg("%s close session, icsk_probes_out=%u, icsk_backoff=%u, max_probes=%u",
-			__func__, icsk_probes_out, icsk_backoff, max_probes);
+		nip_dbg("close session, probes_out=%u, icsk_backoff=%u, max_probes=%u",
+			icsk_probes_out, icsk_backoff, max_probes);
 		tcp_nip_write_err(sk);
 	} else {
 		icsk_backoff = icsk->icsk_backoff;
 		icsk_probes_out = icsk->icsk_probes_out;
-		nip_dbg("%s will send probe0, icsk_probes_out=%u, icsk_backoff=%u, max_probes=%u",
-			__func__, icsk_probes_out, icsk_backoff, max_probes);
+		nip_dbg("will send probe0, probes_out=%u, icsk_backoff=%u, max_probes=%u",
+			icsk_probes_out, icsk_backoff, max_probes);
 		/* Only send another probe if we didn't close things up. */
 		tcp_nip_send_probe0(sk);
 	}
@@ -294,8 +317,8 @@ static bool tcp_nip_keepalive_is_timeout(struct sock *sk, u32 elapsed)
 		     ntp->nip_keepalive_out > 0) ||
 		     (icsk->icsk_user_timeout == 0 &&
 		      ntp->nip_keepalive_out >= keepalive_probes(tp))) {
-			nip_dbg("%s normal keepalive timeout, keepalive_out=%u",
-				__func__, ntp->nip_keepalive_out);
+			nip_dbg("normal keepalive timeout, keepalive_out=%u",
+				ntp->nip_keepalive_out);
 			tcp_nip_write_err(sk);
 			is_timeout = true;
 		}
@@ -320,7 +343,7 @@ static void tcp_nip_keepalive_timer(struct timer_list *t)
 	}
 
 	if (sk->sk_state == TCP_LISTEN) {
-		nip_dbg("%s: keepalive on a LISTEN", __func__);
+		nip_dbg("keepalive on a LISTEN");
 		goto out;
 	}
 	tcp_mstamp_refresh(tp);
@@ -330,7 +353,7 @@ static void tcp_nip_keepalive_timer(struct timer_list *t)
 	 */
 	if ((sk->sk_state == TCP_FIN_WAIT2 || sk->sk_state == TCP_CLOSING) &&
 	    sock_flag(sk, SOCK_DEAD)) {
-		nip_dbg("%s: finish wait, close sock, sk_state=%u", __func__, sk->sk_state);
+		nip_dbg("finish wait, close sock, sk_state=%u", sk->sk_state);
 		goto death;
 	}
 

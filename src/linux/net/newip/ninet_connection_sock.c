@@ -11,7 +11,7 @@
  *
  * Based on net/ipv4/inet_connection_sock.c
  */
-#define pr_fmt(fmt) "NIP: " fmt
+#define pr_fmt(fmt) KBUILD_MODNAME ": [%s:%d] " fmt, __func__, __LINE__
 
 #include <linux/module.h>
 #include <linux/nip.h>
@@ -25,6 +25,7 @@
 #include <net/sock.h>
 #include <net/ninet_connection_sock.h>
 #include <net/tcp_nip.h>
+#include "tcp_nip_parameter.h"
 
 /* Function
  *	Timeout handler for request processing, used to retransmit SYN+ACK

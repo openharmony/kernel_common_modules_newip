@@ -12,7 +12,7 @@
  * Based on net/ipv4/route.c
  * Based on net/ipv6/route.c
  */
-#define pr_fmt(fmt) "NIP: " fmt
+#define pr_fmt(fmt) KBUILD_MODNAME ": [%s:%d] " fmt, __func__, __LINE__
 
 #include <linux/module.h>
 #include <linux/netdevice.h>
@@ -42,6 +42,7 @@
 
 #include <linux/newip_route.h>
 #include "nip_hdr.h"
+#include "tcp_nip_parameter.h"
 
 static int nip_pkt_discard(struct sk_buff *skb);
 static int nip_pkt_discard_out(struct net *net, struct sock *sk,
@@ -267,7 +268,7 @@ void nip_route_input(struct sk_buff *skb)
 	};
 
 	if (nip_addr_eq(&fln.daddr, &nip_broadcast_addr_arp)) {
-		nip_dbg("%s: recv broadcast packet", __func__);
+		nip_dbg("recv broadcast packet");
 		dst_hold(&net->newip.nip_broadcast_entry->dst);
 		skb_dst_set(skb,
 			    (struct dst_entry *)net->newip.nip_broadcast_entry);
@@ -327,7 +328,7 @@ struct nip_rt_info *nip_pol_route(struct net *net, struct nip_fib_table *table,
 	fn = nip_fib_locate(table->nip_tb_head, &fln->daddr);
 	if (!fn) {
 		rcu_read_unlock_bh();
-		nip_dbg("%s: search fail", __func__);
+		nip_dbg("search fail");
 		rt = net->newip.nip_null_entry;
 		dst_hold_and_use(&rt->dst, jiffies);
 		return rt;
@@ -338,10 +339,10 @@ struct nip_rt_info *nip_pol_route(struct net *net, struct nip_fib_table *table,
 	rt->dst.lastuse = jiffies;
 	rt->dst.__use++;
 	pcpu_rt = nip_rt_get_pcpu_route(rt);
-	nip_dbg("%s: cpu id=%d", __func__, smp_processor_id());
+	nip_dbg("cpu id=%d", smp_processor_id());
 	if (pcpu_rt) {
 		rcu_read_unlock_bh();
-		nip_dbg("%s: pcpu found", __func__);
+		nip_dbg("pcpu found");
 	} else {
 		dst_hold(&rt->dst);
 		rcu_read_unlock_bh();
@@ -349,7 +350,7 @@ struct nip_rt_info *nip_pol_route(struct net *net, struct nip_fib_table *table,
 		dst_release(&rt->dst);
 	}
 
-	nip_dbg("%s: rt dst.__refcnt=%d, pcpu dst.__refcnt=%d", __func__,
+	nip_dbg("rt dst.__refcnt=%d, pcpu dst.__refcnt=%d",
 		atomic_read(&rt->dst.__refcnt),
 		atomic_read(&pcpu_rt->dst.__refcnt));
 	return pcpu_rt;
@@ -362,12 +363,12 @@ bool nip_bind_addr_check(struct net *net,
 	struct nip_fib_table *fib_tbl = net->newip.nip_fib_local_tbl;
 
 	if (nip_addr_invalid(addr)) {
-		nip_dbg("%s: binding-addr invalid, bitlen=%u", __func__, addr->bitlen);
+		nip_dbg("binding-addr invalid, bitlen=%u", addr->bitlen);
 		return false;
 	}
 
 	if (nip_addr_eq(addr, &nip_any_addr)) {
-		nip_dbg("%s: binding-addr is any addr", __func__);
+		nip_dbg("binding-addr is any addr");
 		return true;
 	}
 
@@ -375,11 +376,11 @@ bool nip_bind_addr_check(struct net *net,
 	fn = nip_fib_locate(fib_tbl->nip_tb_head, addr);
 	rcu_read_unlock_bh();
 	if (!fn) {
-		nip_dbg("%s: binding-addr is not local addr", __func__);
+		nip_dbg("binding-addr is not local addr");
 		return false;
 	}
 
-	nip_dbg("%s: binding-addr is local addr", __func__);
+	nip_dbg("binding-addr is local addr");
 	return true;
 }
 
@@ -395,14 +396,14 @@ static struct nip_rt_info *nip_route_info_create(struct nip_fib_config *cfg)
 	/* find net_device */
 	dev = dev_get_by_index(net, cfg->fc_ifindex);
 	if (!dev) {
-		nip_dbg("%s: fail to get dev by ifindex(%u)", __func__, cfg->fc_ifindex);
+		nip_dbg("fail to get dev by ifindex(%u)", cfg->fc_ifindex);
 		goto out;
 	}
 
 	/* find ninet_dev，which has the newip address list */
 	idev = nin_dev_get(dev);
 	if (!idev) {
-		nip_dbg("%s: fail to get ninet dev (ifindex=%u)", __func__, cfg->fc_ifindex);
+		nip_dbg("fail to get ninet dev (ifindex=%u)", cfg->fc_ifindex);
 		goto out;
 	}
 
@@ -412,13 +413,13 @@ static struct nip_rt_info *nip_route_info_create(struct nip_fib_config *cfg)
 	err = -ENOBUFS;
 	table = nip_fib_get_table(net, cfg->fc_table);
 	if (!table) {
-		nip_dbg("%s: fail to get fib table (fc_table=%u)", __func__, cfg->fc_table);
+		nip_dbg("fail to get fib table (fc_table=%u)", cfg->fc_table);
 		goto out;
 	}
 
 	rt = nip_dst_alloc(net, NULL, (cfg->fc_flags & RTF_ADDRCONF) ? 0 : DST_NOCOUNT);
 	if (!rt) {
-		nip_dbg("%s: fail to alloc dst mem", __func__);
+		nip_dbg("fail to alloc dst mem");
 		err = -ENOMEM;
 		goto out;
 	}
@@ -493,7 +494,7 @@ int nip_route_add(struct nip_fib_config *cfg)
 
 	rt = nip_route_info_create(cfg);
 	if (IS_ERR(rt)) {
-		nip_dbg("%s: fail to creat route info", __func__);
+		nip_dbg("fail to creat route info");
 		err = PTR_ERR(rt);
 		rt = NULL;
 		goto out;
@@ -565,20 +566,20 @@ int nip_route_ioctl(struct net *net, unsigned int cmd, struct nip_rtmsg *rtmsg)
 	int err;
 
 	if (!ns_capable(net->user_ns, CAP_NET_ADMIN)) {
-		nip_dbg("%s: not admin can`t cfg", __func__);
+		nip_dbg("not admin can`t cfg");
 		return -EPERM;
 	}
 
 	rtmsg_to_fibni_config(net, rtmsg, &cfg);
 	if (nip_addr_invalid(&cfg.fc_dst)) {
-		nip_dbg("%s: nip daddr invalid, bitlen=%u", __func__, cfg.fc_dst.bitlen);
+		nip_dbg("nip daddr invalid, bitlen=%u", cfg.fc_dst.bitlen);
 		return -EFAULT;
 	}
 
 	if (cfg.fc_flags & RTF_GATEWAY) {
 		if (nip_addr_invalid(&cfg.fc_gateway)) {
-			nip_dbg("%s: nip gateway daddr invalid, bitlen=%u",
-				__func__, cfg.fc_gateway.bitlen);
+			nip_dbg("nip gateway daddr invalid, bitlen=%u",
+				cfg.fc_gateway.bitlen);
 			return -EFAULT;
 		}
 	}
@@ -611,12 +612,12 @@ static void nip_dst_destroy(struct dst_entry *dst)
 	idev = rt->rt_idev;
 	if (idev) {
 		rt->rt_idev = NULL;
-		nip_dbg("%s: idev->refcnt=%u", __func__, refcount_read(&idev->refcnt));
+		nip_dbg("idev->refcnt=%u", refcount_read(&idev->refcnt));
 		nin_dev_put(idev);
 	}
 
 	if (from)
-		nip_dbg("%s: from->__refcnt=%d", __func__, atomic_read(&from->__refcnt));
+		nip_dbg("from->__refcnt=%d", atomic_read(&from->__refcnt));
 	rt->from = NULL;
 	dst_release(from);
 }
@@ -778,10 +779,10 @@ static int nip_fib_ifdown(struct nip_rt_info *rt, void *arg)
 	    (dev_unregister || ignore_route_ifdown))
 		return -1;
 
-	nip_dbg("%s: don`t del route with %s down, ifindex=%u, not_same_dev=%u, not_null_entry=%u",
-		__func__, dev->name, dev->ifindex, not_same_dev, not_null_entry);
-	nip_dbg("%s: not_broadcast_entry=%u, dev_unregister=%u, ignore_route_ifdown=%u",
-		__func__, not_broadcast_entry, dev_unregister, ignore_route_ifdown);
+	nip_dbg("don`t del route with %s down, ifindex=%u, not_same_dev=%u, not_null_entry=%u",
+		dev->name, dev->ifindex, not_same_dev, not_null_entry);
+	nip_dbg("not_broadcast_entry=%u, dev_unregister=%u, ignore_route_ifdown=%u",
+		not_broadcast_entry, dev_unregister, ignore_route_ifdown);
 	return 0;
 }
 

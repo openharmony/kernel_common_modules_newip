@@ -48,6 +48,12 @@ bool get_ack_retrans_debug(void);
 /*********************************************************************************************/
 /*                            nip debug parameters                                           */
 /*********************************************************************************************/
+#define nip_dbg(fmt, ...) \
+do { \
+	if (get_nip_debug()) \
+		pr_crit(fmt, ##__VA_ARGS__); \
+} while (0)
+
 /* Debugging of threshold change */
 #define ssthresh_dbg(fmt, ...) \
 do { \

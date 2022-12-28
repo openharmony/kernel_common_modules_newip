@@ -7,12 +7,13 @@
  *
  * Based on net/ipv6/addrconf_core.c
  */
-#define pr_fmt(fmt) "NIP: " fmt
+#define pr_fmt(fmt) KBUILD_MODNAME ": [%s:%d] " fmt, __func__, __LINE__
 
 #include <net/nip.h>
 #include <net/nip_addrconf.h>
 #include <net/ip.h>
 #include <linux/export.h>
+#include "tcp_nip_parameter.h"
 
 static void nin_dev_finish_destroy_rcu(struct rcu_head *head)
 {

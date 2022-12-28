@@ -12,7 +12,7 @@
  * Based on net/ipv4/tcp_output.c
  * Based on net/ipv4/tcp_minisocks.c
  */
-#define pr_fmt(fmt) "NIP-TCP: " fmt
+#define pr_fmt(fmt) KBUILD_MODNAME ": [%s:%d] " fmt, __func__, __LINE__
 
 #include <net/nip.h>
 #include <net/tcp_nip.h>
@@ -105,6 +105,21 @@ static void tcp_nip_event_new_data_sent(struct sock *sk, struct sk_buff *skb)
 		tcp_nip_rearm_rto(sk);
 }
 
+/* check probe0 timer */
+static void tcp_nip_check_probe_timer(struct sock *sk)
+{
+	unsigned long when;
+
+	if (!tcp_sk(sk)->packets_out && !inet_csk(sk)->icsk_pending) {
+		when = tcp_probe0_base(sk);
+		nip_dbg("start probe0 timer, when=%lu, RTO MAX=%u", when, TCP_RTO_MAX);
+		inet_csk_reset_xmit_timer(sk, ICSK_TIME_PROBE0, when, TCP_RTO_MAX);
+	} else if (inet_csk(sk)->icsk_pending != ICSK_TIME_PROBE0) {
+		nip_dbg("can`t start probe0 timer, packets_out=%u, icsk_pending=%u",
+			tcp_sk(sk)->packets_out, inet_csk(sk)->icsk_pending);
+	}
+}
+
 void __tcp_nip_push_pending_frames(struct sock *sk, unsigned int cur_mss,
 				   int nonagle)
 {
@@ -138,8 +153,8 @@ u32 __nip_tcp_select_window(struct sock *sk)
 
 		free_space = round_down(free_space, 1 << tp->rx_opt.rcv_wscale);
 		if (free_space < (allowed_space >> TCP_NUM_4) || free_space < mss) {
-			nip_dbg("%s rcv_wnd is 0, [allowed|full|free]space=[%u, %u, %u], mss=%u",
-				__func__, allowed_space, full_space, free_space, mss);
+			nip_dbg("rcv_wnd is 0, [allowed|full|free]space=[%u, %u, %u], mss=%u",
+				allowed_space, full_space, free_space, mss);
 			return 0;
 		}
 	}
@@ -165,9 +180,8 @@ u32 __nip_tcp_select_window(struct sock *sk)
 	 * 1<<rcv_wscale > mss.
 	 */
 	window = ALIGN(window, (1 << tp->rx_opt.rcv_wscale));
-	nip_dbg("%s wscale(%u) win change [%u to %u], [allowed|free]space=[%u, %u], mss=%u",
-		__func__, tp->rx_opt.rcv_wscale, free_space, window,
-		allowed_space, free_space, mss);
+	nip_dbg("wscale(%u) win change [%u to %u], [allowed|free]space=[%u, %u], mss=%u",
+		tp->rx_opt.rcv_wscale, free_space, window, allowed_space, free_space, mss);
 	return window;
 }
 
@@ -200,8 +214,8 @@ static u16 nip_tcp_select_window(struct sock *sk)
 			NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPWANTZEROWINDOWADV);
 		new_win_bak = new_win;
 		new_win = ALIGN(cur_win, 1 << tp->rx_opt.rcv_wscale);
-		nip_dbg("%s when new_win(%u) < cur_win(%u), win change [%u to %u]",
-			__func__, new_win_bak, cur_win, new_win_bak, new_win);
+		nip_dbg("when new_win(%u) < cur_win(%u), win change [%u to %u]",
+			new_win_bak, cur_win, new_win_bak, new_win);
 	}
 	tp->rcv_wnd = new_win;
 	tp->rcv_wup = tp->rcv_nxt;
@@ -219,8 +233,7 @@ static u16 nip_tcp_select_window(struct sock *sk)
 	 */
 	new_win_bak = new_win;
 	new_win >>= tp->rx_opt.rcv_wscale;
-	nip_dbg("%s wscale(%u) win change [%u to %u]",
-		__func__, tp->rx_opt.rcv_wscale, new_win_bak, new_win);
+	nip_dbg("wscale(%u) win change [%u to %u]", tp->rx_opt.rcv_wscale, new_win_bak, new_win);
 	if (new_win == 0) {
 		tp->pred_flags = 0;
 		if (old_win)
@@ -523,8 +536,8 @@ static int __tcp_nip_transmit_skb(struct sock *sk, struct sk_buff *skb,
 		th->window = htons(min(tp->rcv_wnd, TCP_NIP_WINDOW_MAX));
 
 	ack = tcb->tcp_flags & TCPHDR_ACK;
-	nip_dbg("%s sport=%u, dport=%u, win=%u, rcvbuf=%d, sk_rmem_alloc=%d, ack=%u, skb->len=%u",
-		__func__, ntohs(inet->inet_sport), ntohs(inet->inet_dport), ntohs(th->window),
+	nip_dbg("sport=%u, dport=%u, win=%u, rcvbuf=%d, sk_rmem_alloc=%d, ack=%u, skb->len=%u",
+		ntohs(inet->inet_sport), ntohs(inet->inet_dport), ntohs(th->window),
 		sk->sk_rcvbuf, atomic_read(&sk->sk_rmem_alloc), ack, skb->len);
 
 	/* Fill in checksum */
@@ -618,9 +631,9 @@ unsigned int tcp_nip_sync_mss(struct sock *sk, u32 pmtu)
 		icsk->icsk_mtup.search_high = pmtu;
 
 	mss_now = tcp_nip_mtu_to_mss(sk, pmtu);
-	nip_dbg("%s: sync mtu_to_mss %d", __func__, mss_now);
+	nip_dbg("sync mtu_to_mss %d", mss_now);
 	mss_now = tcp_bound_to_half_wnd(tp, mss_now);
-	nip_dbg("%s: sync bound to half wnd %d", __func__, mss_now);
+	nip_dbg("sync bound to half wnd %d", mss_now);
 
 	/* And store cached results */
 	icsk->icsk_pmtu_cookie = pmtu;
@@ -628,7 +641,7 @@ unsigned int tcp_nip_sync_mss(struct sock *sk, u32 pmtu)
 		mss_now = min(mss_now, tcp_nip_mtu_to_mss(sk, icsk->icsk_mtup.search_low));
 	tp->mss_cache = mss_now;
 
-	nip_dbg("%s: sync final mss %d", __func__, mss_now);
+	nip_dbg("sync final mss %d", mss_now);
 
 	return mss_now;
 }
@@ -852,9 +865,9 @@ int __nip_send_synack(struct request_sock *req, struct sk_buff *skb)
 	head.total_len = skb->len;
 	err = nip_send_skb(skb);
 	if (err)
-		nip_dbg("%s: failed to send skb, skb->len=%u", __func__, head.total_len);
+		nip_dbg("failed to send skb, skb->len=%u", head.total_len);
 	else
-		nip_dbg("%s: send skb ok, skb->len=%u", __func__, head.total_len);
+		nip_dbg("send skb ok, skb->len=%u", head.total_len);
 
 	return err;
 }
@@ -943,7 +956,7 @@ void tcp_nip_send_fin(struct sock *sk)
 	struct tcp_sock *tp = tcp_sk(sk);
 	u32 cur_mss;
 
-	nip_dbg("%s: send fin", __func__);
+	nip_dbg("send fin");
 	/* Set the fin position of the last packet to 1 */
 	if (tskb && tcp_nip_send_head(sk)) {
 coalesce:
@@ -972,7 +985,7 @@ void tcp_nip_send_active_reset(struct sock *sk, gfp_t priority)
 {
 	struct sk_buff *skb;
 
-	nip_dbg("%s: send RST", __func__);
+	nip_dbg("send rst");
 	/* NOTE: No TCP options attached and we never retransmit this. */
 	skb = alloc_skb(MAX_TCP_HEADER, priority);
 	if (!skb)
@@ -1048,8 +1061,8 @@ static bool tcp_nip_write_xmit(struct sock *sk, unsigned int mss_now, int nonagl
 		if (tstamp >= get_ack_to_nxt_snd_tstamp()) {
 			ntp->nip_ssthresh = get_ssthresh_low_min();
 			snd_num = ntp->nip_ssthresh / mss_now;
-			ssthresh_dbg("%s new snd tstamp %u >= %u, ssthresh %u to %u, snd_num=%u",
-				     __func__, tstamp, get_ack_to_nxt_snd_tstamp(),
+			ssthresh_dbg("new snd tstamp %u >= %u, ssthresh %u to %u, snd_num=%u",
+				     tstamp, get_ack_to_nxt_snd_tstamp(),
 				     last_nip_ssthresh, ntp->nip_ssthresh, snd_num);
 		}
 	}
@@ -1059,8 +1072,7 @@ static bool tcp_nip_write_xmit(struct sock *sk, unsigned int mss_now, int nonagl
 
 		tcp_nip_init_tso_segs(skb, mss_now);
 		snd_wnd_ready = tcp_nip_snd_wnd_test(tp, skb, mss_now);
-		nip_dbg("%s %s, skb->len=%u", __func__,
-			(snd_wnd_ready ? str[1] : str[0]), skb->len);
+		nip_dbg("%s, skb->len=%u", (snd_wnd_ready ? str[1] : str[0]), skb->len);
 		if (unlikely(!snd_wnd_ready))
 			break;
 
@@ -1225,7 +1237,7 @@ static int tcp_nip_xmit_probe_skb(struct sock *sk, int urgent, int mib)
 
 	NET_INC_STATS(sock_net(sk), mib);
 	ret = tcp_nip_transmit_skb(sk, skb, 0, (__force gfp_t)0);
-	nip_dbg("%s: send %s probe packet, ret=%d", __func__, str[probe_type], ret);
+	nip_dbg("send %s probe packet, ret=%d", str[probe_type], ret);
 	return ret;
 }
 
@@ -1234,8 +1246,10 @@ int tcp_nip_write_wakeup(struct sock *sk, int mib)
 	struct tcp_sock *tp = tcp_sk(sk);
 	struct sk_buff *skb;
 
-	if (sk->sk_state == TCP_CLOSE)
+	if (sk->sk_state == TCP_CLOSE) {
+		nip_dbg("no probe0 when tcp close");
 		return -1;
+	}
 
 	skb = tcp_nip_send_head(sk);
 	/* If the serial number of the next packet is in the sending window */
@@ -1252,13 +1266,14 @@ int tcp_nip_write_wakeup(struct sock *sk, int mib)
 			err = tcp_fragment(sk, TCP_FRAG_IN_WRITE_QUEUE,
 					   skb, seg_size, mss, GFP_ATOMIC);
 			if (err) {
-				nip_dbg("%s tcp_fragment return err=%d", __func__, err);
+				nip_dbg("tcp_fragment return err=%d", err);
 				return -1;
 			}
 		}
 		err = tcp_nip_transmit_skb(sk, skb, 1, GFP_ATOMIC);
 		if (!err)
 			tcp_nip_event_new_data_sent(sk, skb);
+		nip_dbg("transmit skb %s", (!err ? "ok" : "fail"));
 		return err;
 	} else {
 		return tcp_nip_xmit_probe_skb(sk, 0, mib);
@@ -1271,8 +1286,7 @@ void tcp_nip_send_probe0(struct sock *sk)
 	struct inet_connection_sock *icsk = inet_csk(sk);
 	struct tcp_sock *tp = tcp_sk(sk);
 	struct net *net = sock_net(sk);
-	unsigned long probe_max;
-	int when;
+	unsigned long when;
 	/* An ACK packet with snd_UNa-1 and length 0 is sent as a zero-window detection packet */
 	int err = tcp_nip_write_wakeup(sk, LINUX_MIB_TCPWINPROBE);
 
@@ -1281,38 +1295,29 @@ void tcp_nip_send_probe0(struct sock *sk)
 	 */
 	if (tp->packets_out || !tcp_nip_send_head(sk)) {
 		/* Cancel probe timer, if it is not required. */
-		nip_dbg("%s packets_out(%u) not 0 or send_head is NULL, cancel probe0 timer",
-			__func__, tp->packets_out);
+		nip_dbg("packets_out(%u) not 0 or send_head is NULL, cancel probe0 timer",
+			tp->packets_out);
 		icsk->icsk_probes_out = 0;
 		icsk->icsk_backoff = 0;
 		return;
 	}
 
 	/* Err: 0 succeeded, -1 failed */
+	icsk->icsk_probes_out++; /* Number of probes +1 */
 	if (err <= 0) {
 		if (icsk->icsk_backoff < net->ipv4.sysctl_tcp_retries2)
 			icsk->icsk_backoff++;
-		icsk->icsk_probes_out++; /* Number of probes +1 */
-		probe_max = TCP_RTO_MAX;
-		nip_dbg("%s probe0 send %s, icsk_probes_out=%u, icsk_backoff=%u, probe_max=%u",
-			__func__, (!err ? "ok" : "fail"), icsk->icsk_probes_out,
-			icsk->icsk_backoff, probe_max);
+		when = tcp_probe0_when(sk, TCP_RTO_MAX);
+		nip_dbg("probe0 %s, probes_out=%u, probe0_base=%lu, icsk_backoff=%u, when=%lu",
+			(!err ? "send ok" : "send fail"), icsk->icsk_probes_out,
+			tcp_probe0_base(sk), icsk->icsk_backoff, when);
 	} else {
-		/* If packet was not sent due to local congestion,
-		 * do not backoff and do not remember icsk_probes_out.
-		 * Let local senders to fight for local resources.
-		 * Use accumulated backoff yet.
-		 */
-		if (!icsk->icsk_probes_out)
-			icsk->icsk_probes_out = 1;
-
 		/* Makes the zero window probe timer time out faster */
-		probe_max = TCP_RESOURCE_PROBE_INTERVAL;
-		nip_dbg("%s probe0 not sent due to local congestion, make timer time out faster",
-			__func__);
+		when = TCP_RESOURCE_PROBE_INTERVAL;
+		nip_dbg("probe0 not sent due to local congestion, make timer out faster");
 	}
 
-	when = tcp_probe0_when(sk, probe_max);
-	nip_dbg("%s restart probe0 timer, when=%u, probe_max=%u", __func__, when, probe_max);
+	nip_dbg("restart probe0 timer, when=%lu, icsk_backoff=%u, probe_max=%u",
+		when, icsk->icsk_backoff, TCP_RTO_MAX);
 	inet_csk_reset_xmit_timer(sk, ICSK_TIME_PROBE0, when, TCP_RTO_MAX);
 }

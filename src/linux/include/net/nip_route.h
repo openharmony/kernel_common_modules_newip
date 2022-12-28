@@ -63,4 +63,4 @@ int nip_route_init(void);
 
 void nip_route_cleanup(void);
 
-#endif /*_NET_NIP_ROUTE_H */
+#endif /* _NET_NIP_ROUTE_H */
