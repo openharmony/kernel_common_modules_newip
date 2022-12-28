@@ -20,12 +20,14 @@ void ninet_ehashfn_hook(void *data, const struct sock *sk, u32 *ret)
 void ninet_gifconf_hook(void *data, struct net_device *dev,
 			char __user *buf, int len, int size, int *ret)
 {
-	int done = ninet_gifconf(dev, buf + *ret, len - *ret, size);
+	if (*ret >= 0) {
+		int done = ninet_gifconf(dev, buf + *ret, len - *ret, size);
 
-	if (done < 0)
-		*ret = done;
-	else
-		*ret += done;
+		if (done < 0)
+			*ret = done;
+		else
+			*ret += done;
+	}
 }
 
 int ninet_hooks_register(void)
