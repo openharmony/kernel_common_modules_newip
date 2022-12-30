@@ -89,7 +89,6 @@ static inline u32 nip_addr_hash(const struct nip_addr *a)
 int nip_send_skb(struct sk_buff *skb);
 
 void ninet_destroy_sock(struct sock *sk);
-int nip_datagram_connect_v6_only(struct sock *sk, struct sockaddr *addr, int addr_len);
 int nip_datagram_dst_update(struct sock *sk, bool fix_sk_saddr);
 int ninet_add_protocol(const struct ninet_protocol *prot, unsigned char protocol);
 int ninet_del_protocol(const struct ninet_protocol *prot, unsigned char protocol);

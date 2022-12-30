@@ -1304,6 +1304,7 @@ static int tcp_nip_do_rcv(struct sock *sk, struct sk_buff *skb)
 		struct dst_entry *dst = sk->sk_rx_dst;
 
 		if (dst) {
+			/* Triggered when processing newly received skb after deleting routes */
 			if (inet_sk(sk)->rx_dst_ifindex != skb->skb_iif ||
 			    !dst->ops->check(dst, 0)) {
 				dst_release(dst);
