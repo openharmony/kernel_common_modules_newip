@@ -96,7 +96,7 @@ int parse_name(char **argv, int *ifindex, char *dev)
 	int len = strlen(*argv);
 
 	memset(dev, 0, ARRAY_LEN);
-	if (!len || len >= (ARRAY_LEN - 1))
+	if (len >= (ARRAY_LEN - 1) || !len)
 		return -1;
 	memcpy(dev, *argv, len);
 	dev[len + 1] = '\0';
