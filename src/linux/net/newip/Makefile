@@ -13,5 +13,3 @@ newip-objs += tcp_nip.o ninet_connection_sock.o ninet_hashtables.o tcp_nip_outpu
 
 newip-objs += nip_hooks_register.o
 
-# net/newip/hooks/Makefile
-obj-$(CONFIG_NEWIP) += hooks/

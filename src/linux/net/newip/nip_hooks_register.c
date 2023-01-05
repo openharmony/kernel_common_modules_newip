@@ -9,17 +9,17 @@
 
 #include <net/ninet_hashtables.h>      /* ninet_ehashfn */
 #include <net/if_ninet.h>
-#include <trace/hooks/nip_hooks.h>
+#include <trace/hooks/inet.h>
 #include "tcp_nip_parameter.h"
 
-void ninet_ehashfn_hook(void *data, const struct sock *sk, u32 *ret)
+void vendor_ninet_ehashfn(void *data, const struct sock *sk, u32 *ret)
 {
 	*ret = ninet_ehashfn(sock_net(sk), &sk->sk_nip_rcv_saddr,
 			     sk->sk_num, &sk->sk_nip_daddr, sk->sk_dport);
 }
 
-void ninet_gifconf_hook(void *data, struct net_device *dev,
-			char __user *buf, int len, int size, int *ret)
+void vendor_ninet_gifconf(void *data, struct net_device *dev,
+			 char __user *buf, int len, int size, int *ret)
 {
 	if (*ret >= 0) {
 		int done = ninet_gifconf(dev, buf + *ret, len - *ret, size);
@@ -35,15 +35,15 @@ int ninet_hooks_register(void)
 {
 	int ret;
 
-	ret = register_trace_ninet_ehashfn_hook(&ninet_ehashfn_hook, NULL);
+	ret = register_trace_vendor_ninet_ehashfn(&vendor_ninet_ehashfn, NULL);
 	if (ret) {
-		nip_dbg("failed to register to ninet_ehashfn_hook");
+		nip_dbg("failed to register to vendor_ninet_ehashfn");
 		return -1;
 	}
 
-	ret = register_trace_ninet_gifconf_hook(&ninet_gifconf_hook, NULL);
+	ret = register_trace_vendor_ninet_gifconf(&vendor_ninet_gifconf, NULL);
 	if (ret) {
-		nip_dbg("failed to register to ninet_gifconf_hook");
+		nip_dbg("failed to register to vendor_ninet_gifconf");
 		return -1;
 	}
 
