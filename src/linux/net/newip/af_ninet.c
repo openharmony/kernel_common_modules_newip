@@ -47,7 +47,7 @@
 #include <linux/netlink.h>
 
 #ifdef CONFIG_NEWIP_HOOKS
-#include <trace/hooks/nip_hooks.h>
+#include <trace/hooks/inet.h>
 #include "nip_hooks_register.h"
 #endif
 #include "tcp_nip_parameter.h"

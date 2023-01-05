@@ -3,7 +3,8 @@
 #
 
 config NEWIP_HOOKS
-	def_bool NEWIP
+	bool "NEWIP HOOKS"
+	default n
 	depends on VENDOR_HOOKS && NEWIP
 	help
 	  Enable NewIP hooks implemented as tracepoints
