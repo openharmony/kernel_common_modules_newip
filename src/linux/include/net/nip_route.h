@@ -17,10 +17,10 @@ struct nip_rt_info *nip_addrconf_dst_alloc(struct ninet_dev *idev,
 					   const struct nip_addr *addr);
 
 
-void nip_route_input(struct sk_buff *skb);
+int nip_route_input(struct sk_buff *skb);
 struct dst_entry *nip_route_input_lookup(struct net *net,
 					 struct net_device *dev,
-					 struct flow_nip *fln, int flags);
+					 struct flow_nip *fln, int flags, int *tbl_type);
 
 struct dst_entry *nip_route_output_flags(struct net *net, const struct sock *sk,
 					 struct flow_nip *fln, int flags);

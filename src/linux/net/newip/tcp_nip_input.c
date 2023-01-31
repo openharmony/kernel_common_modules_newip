@@ -105,105 +105,340 @@ void tcp_nip_fin(struct sock *sk)
 		sk->sk_state_change(sk);
 }
 
-static void tcp_nip_overlap_handle(struct tcp_sock *tp, struct sk_buff *skb)
-{
-		u32 diff = tp->rcv_nxt - TCP_SKB_CB(skb)->seq;
-		struct tcp_skb_cb *tcb = TCP_SKB_CB(skb);
-
-		skb->data += diff;
-		skb->len -= diff;
-		tcb->seq += diff;
-}
-
-static void tcp_nip_ofo_queue(struct sock *sk)
-{
-	struct tcp_sock *tp = tcp_sk(sk);
-
-	while (tp->nip_out_of_order_queue) {
-		struct sk_buff *skb = tp->nip_out_of_order_queue;
-
-		if (after(TCP_SKB_CB(tp->nip_out_of_order_queue)->seq, tp->rcv_nxt))
-			return;
-		tp->nip_out_of_order_queue = tp->nip_out_of_order_queue->next;
-		skb->next = NULL;
-		if (tp->rcv_nxt != TCP_SKB_CB(skb)->seq)
-			tcp_nip_overlap_handle(tp, skb);
-
-		__skb_queue_tail(&sk->sk_receive_queue, skb);
-		tp->rcv_nxt = TCP_SKB_CB(skb)->end_seq;
-
-		while (tp->nip_out_of_order_queue &&
-		       before(TCP_SKB_CB(tp->nip_out_of_order_queue)->end_seq, tp->rcv_nxt)) {
-			struct sk_buff *tmp_skb = tp->nip_out_of_order_queue;
-
-			tp->nip_out_of_order_queue = tp->nip_out_of_order_queue->next;
-			tmp_skb->next = NULL;
-			__kfree_skb(tmp_skb);
-		}
-	}
-}
-
- /* Maintain a sort list order by the seq. */
-static void tcp_nip_data_queue_ofo(struct sock *sk, struct sk_buff *skb)
-{
-	struct tcp_sock *tp = tcp_sk(sk);
-	struct sk_buff *pre_skb, *cur_skb;
-
-	inet_csk_schedule_ack(sk);
-	skb->next = NULL;
-	if (!tp->nip_out_of_order_queue) {
-		tp->nip_out_of_order_queue = skb;
-		skb_set_owner_r(skb, sk);
-		return;
-	}
-	pre_skb = tp->nip_out_of_order_queue;
-	cur_skb = pre_skb->next;
-	if (TCP_SKB_CB(skb)->seq == TCP_SKB_CB(pre_skb)->seq) {
-		if (TCP_SKB_CB(skb)->end_seq > TCP_SKB_CB(pre_skb)->end_seq) {
-			skb->next = pre_skb->next;
-			pre_skb->next = NULL;
-			skb_set_owner_r(skb, sk);
-			__kfree_skb(pre_skb);
-			return;
-		}
-		__kfree_skb(skb);
-		return;
-	} else if (TCP_SKB_CB(skb)->seq < TCP_SKB_CB(pre_skb)->seq) {
-		tp->nip_out_of_order_queue = skb;
-		skb->next = pre_skb;
-		skb_set_owner_r(skb, sk);
-		return;
-	}
-	while (cur_skb) {
-		if (TCP_SKB_CB(skb)->seq == TCP_SKB_CB(cur_skb)->seq) {
-			/* Same seq, if skb end_seq is bigger, replace. */
-			if (TCP_SKB_CB(skb)->end_seq > TCP_SKB_CB(cur_skb)->end_seq) {
-				pre_skb->next = skb;
-				skb->next = cur_skb->next;
-				cur_skb->next = NULL;
-				skb_set_owner_r(skb, sk);
-				__kfree_skb(cur_skb);
-			} else {
-				__kfree_skb(skb);
-			}
-			return;
-		} else if (TCP_SKB_CB(skb)->seq < TCP_SKB_CB(cur_skb)->seq) {
-			pre_skb->next = skb;
-			skb->next = cur_skb;
-			skb_set_owner_r(skb, sk);
-			return;
-		}
-		pre_skb = pre_skb->next;
-		cur_skb = cur_skb->next;
-	}
-	pre_skb->next = skb;
-	skb_set_owner_r(skb, sk);
-}
-
-static void tcp_drop(struct sock *sk, struct sk_buff *skb)
+static void tcp_nip_drop(struct sock *sk, struct sk_buff *skb)
 {
 	sk_drops_add(sk, skb);
 	__kfree_skb(skb);
+}
+
+static void tcp_nip_overlap_handle(struct tcp_sock *tp, struct sk_buff *skb)
+{
+	u32 diff = tp->rcv_nxt - TCP_SKB_CB(skb)->seq;
+	struct tcp_skb_cb *tcb = TCP_SKB_CB(skb);
+
+	skb->data += diff;
+	skb->len -= diff;
+	tcb->seq += diff;
+}
+
+static void tcp_nip_left_overlap(struct sk_buff *cur, struct sk_buff *skb)
+{
+	u32 diff = TCP_SKB_CB(skb)->end_seq - TCP_SKB_CB(cur)->seq;
+	struct tcp_skb_cb *tcb = TCP_SKB_CB(cur);
+
+	cur->data += diff;
+	cur->len -= diff;
+	tcb->seq += diff;
+}
+
+static void tcp_nip_right_overlap(struct sk_buff *cur, struct sk_buff *skb)
+{
+	u32 diff = TCP_SKB_CB(cur)->end_seq - TCP_SKB_CB(skb)->seq;
+	struct tcp_skb_cb *tcb = TCP_SKB_CB(cur);
+	unsigned int len;
+
+	len = cur->len - diff;
+	/* At present NewIP only uses linear regions, uses skb_trim to remove end from a buffer;
+	 * If the nonlinear region is also used later, use pskb_trim to remove end from a buffer;
+	 */
+	skb_trim(cur, len);
+	tcb->end_seq -= diff;
+}
+
+/* If we update tp->rcv_nxt, also update tp->bytes_received */
+static void tcp_nip_rcv_nxt_update(struct tcp_sock *tp, u32 seq)
+{
+	u32 delta = seq - tp->rcv_nxt;
+
+	sock_owned_by_me((struct sock *)tp);
+	tp->bytes_received += delta;
+	WRITE_ONCE(tp->rcv_nxt, seq);
+}
+
+/* tcp_nip_try_coalesce - try to merge skb to prior one
+ * @sk: socket
+ * @to: prior buffer
+ * @from: buffer to add in queue
+ * @fragstolen: pointer to boolean
+ *
+ * Before queueing skb @from after @to, try to merge them
+ * to reduce overall memory use and queue lengths, if cost is small.
+ * Packets in ofo or receive queues can stay a long time.
+ * Better try to coalesce them right now to avoid future collapses.
+ * Returns true if caller should free @from instead of queueing it
+ */
+static bool tcp_nip_try_coalesce(struct sock *sk,
+				 struct sk_buff *to,
+				 struct sk_buff *from,
+				 bool *fragstolen)
+{
+	int delta;
+
+	*fragstolen = false;
+
+	/* Its possible this segment overlaps with prior segment in queue */
+	if (TCP_SKB_CB(from)->seq != TCP_SKB_CB(to)->end_seq)
+		return false;
+
+	if (!skb_try_coalesce(to, from, fragstolen, &delta)) {
+		nip_dbg("try to merge skb to the previous one failed");
+		return false;
+	}
+
+	atomic_add(delta, &sk->sk_rmem_alloc);
+	sk_mem_charge(sk, delta);
+	NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPRCVCOALESCE);
+	TCP_SKB_CB(to)->end_seq = TCP_SKB_CB(from)->end_seq;
+	TCP_SKB_CB(to)->ack_seq = TCP_SKB_CB(from)->ack_seq;
+	TCP_SKB_CB(to)->tcp_flags |= TCP_SKB_CB(from)->tcp_flags;
+
+	if (TCP_SKB_CB(from)->has_rxtstamp) {
+		TCP_SKB_CB(to)->has_rxtstamp = true;
+		to->tstamp = from->tstamp;
+		skb_hwtstamps(to)->hwtstamp = skb_hwtstamps(from)->hwtstamp;
+	}
+
+	return true;
+}
+
+static bool tcp_nip_ooo_try_coalesce(struct sock *sk,
+				     struct sk_buff *to,
+				     struct sk_buff *from,
+				     bool *fragstolen)
+{
+	bool res = tcp_nip_try_coalesce(sk, to, from, fragstolen);
+
+	/* In case tcp_nip_drop() is called later, update to->gso_segs */
+	if (res) {
+		u32 gso_segs = max_t(u16, 1, skb_shinfo(to)->gso_segs) +
+			       max_t(u16, 1, skb_shinfo(from)->gso_segs);
+		u32 to_gso_segs = skb_shinfo(to)->gso_segs;
+
+		nip_dbg("(to)->gso_segs %u, (from)->gso_segs %u", skb_shinfo(to)->gso_segs,
+			skb_shinfo(from)->gso_segs);
+		skb_shinfo(to)->gso_segs = min_t(u32, gso_segs, 0xFFFF);
+		nip_dbg("gso_segs %u to %u", to_gso_segs, skb_shinfo(to)->gso_segs);
+	}
+	return res;
+}
+
+/* This one checks to see if we can put data from the
+ * out_of_order queue into the receive_queue.
+ */
+static void tcp_nip_ofo_queue(struct sock *sk)
+{
+	struct tcp_sock *tp = tcp_sk(sk);
+	bool fin;
+	bool fragstolen;
+	bool eaten;
+	struct sk_buff *skb;
+	struct sk_buff *tail;
+	struct rb_node *p;
+
+	p = rb_first(&tp->out_of_order_queue);
+	while (p) {
+		skb = rb_to_skb(p);
+		if (after(TCP_SKB_CB(skb)->seq, tp->rcv_nxt)) {
+			nip_dbg("nodes are all after rcv_nxt");
+			break;
+		}
+
+		p = rb_next(p);
+		rb_erase(&skb->rbnode, &tp->out_of_order_queue);
+
+		if (unlikely(!after(TCP_SKB_CB(skb)->end_seq, tp->rcv_nxt))) {
+			nip_dbg("this node is before rcv_nxt, drop skb");
+			tcp_nip_drop(sk, skb);
+			continue;
+		}
+
+		tail = skb_peek_tail(&sk->sk_receive_queue);
+		eaten = tail && tcp_nip_try_coalesce(sk, tail, skb, &fragstolen);
+		tcp_nip_rcv_nxt_update(tp, TCP_SKB_CB(skb)->end_seq);
+		fin = TCP_SKB_CB(skb)->tcp_flags & TCPHDR_FIN;
+		if (!eaten)
+			__skb_queue_tail(&sk->sk_receive_queue, skb);
+		else
+			kfree_skb_partial(skb, fragstolen);
+
+		if (unlikely(fin)) {
+			nip_dbg("will send fin");
+			tcp_nip_fin(sk);
+			/* tcp_fin() purges tp->out_of_order_queue,
+			 * so we must end this loop right now.
+			 */
+			break;
+		}
+	}
+}
+
+/* The tcp_nip_data_queue function is responsible for receiving the socket data. For the packets
+ * whose start sequence number is after the sequence to be received by the socket and whose
+ * start sequence number is within the receiving window, current function is called to add them
+ * to the TCP out-of-order queue.
+ */
+static void tcp_nip_data_queue_ofo(struct sock *sk, struct sk_buff *skb)
+{
+	struct tcp_sock *tp = tcp_sk(sk);
+	struct rb_node **p;
+	struct rb_node *parent;
+	struct sk_buff *skb1;
+	struct sk_buff *skb2;
+	u32 seq;
+	u32 end_seq;
+	bool fragstolen;
+
+	if (unlikely(atomic_read(&sk->sk_rmem_alloc) > sk->sk_rcvbuf)) {
+		nip_dbg("no memory, drop pkt");
+		NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPOFODROP);
+		sk->sk_data_ready(sk);
+		tcp_nip_drop(sk, skb);
+		return;
+	}
+
+	/* Disable header prediction. */
+	tp->pred_flags = 0;
+	/* set the ICSK_ACK_SCHED flag bit to indicate that an ACK needs to be sent. */
+	inet_csk_schedule_ack(sk);
+
+	tp->rcv_ooopack += max_t(u16, 1, skb_shinfo(skb)->gso_segs);
+	NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPOFOQUEUE);
+	seq = TCP_SKB_CB(skb)->seq;
+	end_seq = TCP_SKB_CB(skb)->end_seq;
+
+	/* If it is the first out-of-order packet to be added, the out_of_order_queue queue is
+	 * empty, insert it into the queue, and update the last skb pointer ooo_last_skb.
+	 */
+	p = &tp->out_of_order_queue.rb_node;
+	if (RB_EMPTY_ROOT(&tp->out_of_order_queue)) {
+		nip_dbg("add first ofo pkt");
+		rb_link_node(&skb->rbnode, NULL, p);
+		rb_insert_color(&skb->rbnode, &tp->out_of_order_queue);
+		tp->ooo_last_skb = skb;
+		goto end;
+	}
+
+	/* In the typical case, we are adding an skb to the end of the list.
+	 * Use of ooo_last_skb avoids the O(Log(N)) rbtree lookup.
+	 */
+	if (tcp_nip_ooo_try_coalesce(sk, tp->ooo_last_skb, skb, &fragstolen)) {
+coalesce_done:
+		/* fragstolen indicates that the data in the linear cache portion of the data
+		 * packet is merged, but the data in the shared cache is still in use,
+		 * so it cannot be released
+		 */
+		nip_dbg("ofo skb coalesce done");
+		kfree_skb_partial(skb, fragstolen);
+		skb = NULL;
+		goto end;
+	}
+	/* Can avoid an rbtree lookup if we are adding skb after ooo_last_skb */
+	if (!before(seq, TCP_SKB_CB(tp->ooo_last_skb)->end_seq)) {
+		nip_dbg("add skb after ooo_last_skb");
+		parent = &tp->ooo_last_skb->rbnode;
+		p = &parent->rb_right;
+		goto insert;
+	}
+
+	if (after(seq, TCP_SKB_CB(tp->ooo_last_skb)->seq)) {
+		tcp_nip_left_overlap(skb, tp->ooo_last_skb);
+		if (tcp_nip_ooo_try_coalesce(sk, tp->ooo_last_skb, skb, &fragstolen)) {
+			nip_dbg("ofo skb coalesce ooo_last_skb done");
+			goto coalesce_done;
+		} else {
+			nip_dbg("ofo skb coalesce ooo_last_skb failed, drop pkt");
+			tcp_nip_drop(sk, skb);
+			skb = NULL;
+			goto end;
+		}
+	}
+
+	/* Find place to insert this segment. Handle overlaps on the way. */
+	parent = NULL;
+	while (*p) {
+		parent = *p;
+		skb1 = rb_to_skb(parent);
+		if (before(seq, TCP_SKB_CB(skb1)->seq)) {
+			p = &parent->rb_left;
+			continue;
+		}
+		if (before(seq, TCP_SKB_CB(skb1)->end_seq)) {
+			if (!after(end_seq, TCP_SKB_CB(skb1)->end_seq)) {
+				/* skb1->seq <= seq, end_seq <= skb1->end_seq */
+				nip_dbg("completely overlapping, drop pkt");
+				NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPOFOMERGE);
+				tcp_nip_drop(sk, skb);
+				skb = NULL;
+				goto end;
+			}
+			if (after(seq, TCP_SKB_CB(skb1)->seq)) {
+				/* skb1->seq < seq, end_seq > skb1->end_seq */
+				tcp_nip_left_overlap(skb, skb1);
+				skb2 = skb_rb_next(skb1);
+				if (before(TCP_SKB_CB(skb2)->seq, TCP_SKB_CB(skb)->end_seq))
+					tcp_nip_right_overlap(skb, skb2);
+				if (tcp_nip_ooo_try_coalesce(sk, skb1, skb, &fragstolen)) {
+					nip_dbg("partial overlap, ofo skb coalesce done");
+					goto coalesce_done;
+				} else {
+					nip_dbg("partial overlap, ofo skb coalesce failed, drop pkt");
+					tcp_nip_drop(sk, skb);
+					skb = NULL;
+					goto end;
+				}
+			} else {
+				/* skb1->seq == seq, end_seq > skb1->end_seq
+				 * partial overlap, skb covers skb1, replace skb1 with skb.
+				 */
+				nip_dbg("partial overlap, replace old skb node");
+				rb_replace_node(&skb1->rbnode, &skb->rbnode,
+						&tp->out_of_order_queue);
+				NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPOFOMERGE);
+				tcp_nip_drop(sk, skb1);
+				goto merge_right;
+			}
+		} else if (tcp_nip_ooo_try_coalesce(sk, skb1, skb, &fragstolen)) {
+			nip_dbg("ofo skb coalesce done while scan ofo queue");
+			goto coalesce_done;
+		}
+		p = &parent->rb_right;
+	}
+insert:
+	/* Insert segment into RB tree. */
+	nip_dbg("add skb into ofo queue");
+	rb_link_node(&skb->rbnode, parent, p);
+	rb_insert_color(&skb->rbnode, &tp->out_of_order_queue);
+
+merge_right:
+	/* Remove other segments covered by skb. */
+	while ((skb1 = skb_rb_next(skb)) != NULL) {
+		if (!after(end_seq, TCP_SKB_CB(skb1)->seq))
+			break;
+		if (before(end_seq, TCP_SKB_CB(skb1)->end_seq)) {
+			tcp_nip_right_overlap(skb, skb1);
+			nip_dbg("partial overlap, compress the right side of the current package");
+			break;
+		}
+		nip_dbg("del overlapping nodes on the right");
+		rb_erase(&skb1->rbnode, &tp->out_of_order_queue);
+		NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPOFOMERGE);
+		tcp_nip_drop(sk, skb1);
+	}
+	/* If there is no skb after us, we are the last_skb ! */
+	if (!skb1)
+		tp->ooo_last_skb = skb;
+
+end:
+	if (skb) {
+		/* Try space compression for the skb. if the skb has enough space left in its
+		 * linear space, the page fragment from its shared space can be copied into the
+		 * linear space to free the page fragment. If the remaining amount of linear space
+		 * is less than the length of the page fragment, or if the skb has been cloned
+		 * (the page fragment is shared with other SKBS), no compression is performed.
+		 */
+		skb_condense(skb);
+		skb_set_owner_r(skb, sk);
+	}
 }
 
 #define PKT_DISCARD_MAX 500
@@ -246,7 +481,7 @@ static void tcp_nip_data_queue(struct sock *sk, struct sk_buff *skb)
 			TCP_SKB_CB(skb)->seq, TCP_SKB_CB(skb)->end_seq, tp->rcv_nxt);
 out_of_window:
 		inet_csk_schedule_ack(sk);
-		tcp_drop(sk, skb);
+		tcp_nip_drop(sk, skb);
 		return;
 	}
 	icsk->icsk_ack.lrcvtime = tcp_jiffies32;
@@ -259,7 +494,7 @@ out_of_window:
 		/* wake up processes that are blocked for lack of data */
 		sk->sk_data_ready(sk);
 		inet_csk_schedule_ack(sk);
-		tcp_drop(sk, skb);
+		tcp_nip_drop(sk, skb);
 		return;
 	}
 
@@ -282,7 +517,7 @@ out_of_window:
 		inet_csk_schedule_ack(sk);
 		if (TCP_SKB_CB(skb)->tcp_flags & TCPHDR_FIN)
 			tcp_nip_fin(sk);
-		if (tp->nip_out_of_order_queue)
+		if (!RB_EMPTY_ROOT(&tp->out_of_order_queue))
 			tcp_nip_ofo_queue(sk);
 		if (!sock_flag(sk, SOCK_DEAD))
 			sk->sk_data_ready(sk);
@@ -300,7 +535,7 @@ static inline void tcp_nip_push_pending_frames(struct sock *sk)
 {
 	if (tcp_nip_send_head(sk)) {
 		struct tcp_sock *tp = tcp_sk(sk);
-		u32 cur_mss = tcp_nip_current_mss(sk);  // TCP_BASE_MSS
+		u32 cur_mss = tcp_nip_current_mss(sk); // TCP_BASE_MSS
 
 		__tcp_nip_push_pending_frames(sk, cur_mss, tp->nonagle);
 	}
@@ -366,8 +601,8 @@ static void __tcp_nip_ack_snd_check(struct sock *sk, int ofo_possible)
 	if (((tp->rcv_nxt - tp->rcv_wup) > get_ack_num() * inet_csk(sk)->icsk_ack.rcv_mss &&
 	     __nip_tcp_select_window(sk) >= tp->rcv_wnd) ||
 	    /* We have out of order data. */
-	    (ofo_possible && tp->nip_out_of_order_queue)) {
-		if (ofo_possible && tp->nip_out_of_order_queue) {
+	    (ofo_possible && (!RB_EMPTY_ROOT(&tp->out_of_order_queue)))) {
+		if (ofo_possible && (!RB_EMPTY_ROOT(&tp->out_of_order_queue))) {
 			if (tp->rcv_nxt == ntp->last_rcv_nxt) {
 				ntp->dup_ack_cnt++;
 			} else {
@@ -495,12 +730,6 @@ struct request_sock *ninet_reqsk_alloc(const struct request_sock_ops *ops,
 	}
 
 	return req;
-}
-
-static void tcp_nip_drop(struct sock *sk, struct sk_buff *skb)
-{
-	sk_drops_add(sk, skb);
-	__kfree_skb(skb);
 }
 
 void tcp_nip_parse_mss(struct tcp_options_received *opt_rx,
@@ -1289,7 +1518,7 @@ static bool tcp_nip_validate_incoming(struct sock *sk, struct sk_buff *skb,
 	return true;
 
 discard:
-	tcp_drop(sk, skb);
+	tcp_nip_drop(sk, skb);
 	return false;
 }
 
@@ -1315,7 +1544,7 @@ void tcp_nip_rcv_established(struct sock *sk, struct sk_buff *skb,
 	return;
 
 discard:
-	tcp_drop(sk, skb);
+	tcp_nip_drop(sk, skb);
 }
 
 static u32 tcp_default_init_rwnd(u32 mss)
@@ -1436,7 +1665,7 @@ static int tcp_nip_rcv_synsent_state_process(struct sock *sk, struct sk_buff *sk
 		tcp_init_wl(tp, TCP_SKB_CB(skb)->seq);
 
 		tcp_nip_ack(sk, skb);
-		tp->nip_out_of_order_queue = NULL;
+		tp->out_of_order_queue = RB_ROOT;
 		/* The next data number expected to be accepted is +1 */
 		tp->rcv_nxt = TCP_SKB_CB(skb)->seq + 1;
 		/* Accept the left margin of the window +1 */
@@ -1485,7 +1714,7 @@ static int tcp_nip_rcv_synsent_state_process(struct sock *sk, struct sk_buff *sk
 		tcp_nip_send_ack(sk);
 		return -1;
 discard:
-		tcp_drop(sk, skb);
+		tcp_nip_drop(sk, skb);
 		return 0;
 	}
 

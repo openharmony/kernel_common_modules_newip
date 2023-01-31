@@ -38,7 +38,10 @@ static int _nip_update_recv_skb_len(struct sk_buff *skb,
 		return NET_RX_DROP;
 	}
 
-	skb->len = niph->total_len;
+	/* At present, NewIP only uses linear regions, uses skb_trim to remove end from a buffer;
+	 * If the nonlinear region is also used later, use pskb_trim to remove end from a buffer;
+	 */
+	skb_trim(skb, niph->total_len);
 	return 0;
 }
 
@@ -46,6 +49,7 @@ static int nip_rcv_finish(struct sk_buff *skb)
 {
 	struct net *net = dev_net(skb->dev);
 	void (*edemux)(struct sk_buff *skb) = NULL;
+	int err = 0;
 
 	/* set /proc/sys/net/ipv4/ip_early_demux to change sysctl_ip_early_demux,
 	 * which is used by ipv4, ipv6 and newip
@@ -65,8 +69,12 @@ static int nip_rcv_finish(struct sk_buff *skb)
 	 * instead of NULL in skb when looking up failed.
 	 */
 	if (!skb_valid_dst(skb))
-		nip_route_input(skb);
-
+		err = nip_route_input(skb);
+	if (err) {
+		nip_dbg("nip_route_input lookup route exception, release skb");
+		kfree_skb(skb);
+		return 0;
+	}
 	return dst_input(skb);
 }
 

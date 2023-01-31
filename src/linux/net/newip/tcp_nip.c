@@ -575,7 +575,7 @@ static struct sock *tcp_nip_syn_recv_sock(const struct sock *sk, struct sk_buff 
 
 	/* Negotiate MSS */
 	newtp->mss_cache = TCP_BASE_MSS;
-	newtp->nip_out_of_order_queue = NULL;
+	newtp->out_of_order_queue = RB_ROOT;
 	newtp->advmss = dst_metric_advmss(dst);
 	if (tcp_sk(sk)->rx_opt.user_mss &&
 	    tcp_sk(sk)->rx_opt.user_mss < newtp->advmss)
@@ -1260,15 +1260,11 @@ out:
 	return err;
 }
 
-void skb_nip_ofo_queue_purge(struct sock *sk)
+static void skb_nip_rbtree_purge(struct sock *sk)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
-	struct sk_buff *skb;
 
-	while ((skb = tp->nip_out_of_order_queue) != NULL) {
-		tp->nip_out_of_order_queue = tp->nip_out_of_order_queue->next;
-		kfree_skb(skb);
-	}
+	skb_rbtree_purge(&tp->out_of_order_queue);
 }
 
 void tcp_nip_destroy_sock(struct sock *sk)
@@ -1279,7 +1275,7 @@ void tcp_nip_destroy_sock(struct sock *sk)
 
 	tcp_nip_write_queue_purge(sk);
 
-	skb_nip_ofo_queue_purge(sk);
+	skb_nip_rbtree_purge(sk);
 
 	if (inet_csk(sk)->icsk_bind_hash)
 		inet_put_port(sk);
