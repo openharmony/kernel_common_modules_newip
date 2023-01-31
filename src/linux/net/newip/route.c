@@ -33,6 +33,7 @@
 #include <net/lwtunnel.h>
 #include <linux/uaccess.h>   /* copy_from_user() */
 #include <linux/rtnetlink.h> /* rtnl_lock() */
+#include <linux/inetdevice.h>
 
 #include <net/nip_route.h>
 #include <net/nip_fib.h>
@@ -252,12 +253,12 @@ static struct nip_rt_info *nip_pol_route_input(struct net *net,
 
 struct dst_entry *nip_route_input_lookup(struct net *net,
 					 struct net_device *dev,
-					 struct flow_nip *fln, int flags)
+					 struct flow_nip *fln, int flags, int *tbl_type)
 {
-	return nip_fib_rule_lookup(net, fln, flags, nip_pol_route_input);
+	return nip_fib_rule_lookup(net, fln, flags, tbl_type, nip_pol_route_input);
 }
 
-void nip_route_input(struct sk_buff *skb)
+int nip_route_input(struct sk_buff *skb)
 {
 	struct net *net = dev_net(skb->dev);
 	int flags = 0;
@@ -266,16 +267,36 @@ void nip_route_input(struct sk_buff *skb)
 		.daddr = NIPCB(skb)->dstaddr,
 		.saddr = NIPCB(skb)->srcaddr,
 	};
+	struct dst_entry *out_dst;
+	int tbl_type = 0;
 
 	if (nip_addr_eq(&fln.daddr, &nip_broadcast_addr_arp)) {
 		nip_dbg("recv broadcast packet");
 		dst_hold(&net->newip.nip_broadcast_entry->dst);
 		skb_dst_set(skb,
 			    (struct dst_entry *)net->newip.nip_broadcast_entry);
-		return;
+		return 0;
 	}
 
-	skb_dst_set(skb, nip_route_input_lookup(net, skb->dev, &fln, flags));
+	out_dst = nip_route_input_lookup(net, skb->dev, &fln, flags, &tbl_type);
+	skb_dst_set(skb, out_dst);
+
+	if (tbl_type == RT_TABLE_MAIN) {
+		struct ninet_dev *nin_dev = rcu_dereference(skb->dev->nip_ptr);
+		struct ninet_dev *nout_dev = rcu_dereference(out_dst->dev->nip_ptr);
+
+		/* When global variable ipv4 all/send_redirects or
+		 * corresponding network/send_redirects is 1,
+		 * IN_DEV_TX_REDIRECTS() conditions are valid.
+		 * send_redirects default is 1.
+		 */
+		if (nin_dev == nout_dev &&
+		    IN_DEV_TX_REDIRECTS(rcu_dereference(out_dst->dev->ip_ptr))) {
+			nip_dbg("The inlet and outlet are the same");
+			return 1;
+		}
+	}
+	return 0;
 }
 
 static struct nip_rt_info *nip_pol_route_output(struct net *net,
@@ -290,8 +311,9 @@ struct dst_entry *nip_route_output_flags(struct net *net, const struct sock *sk,
 {
 	struct dst_entry *dst;
 	struct nip_rt_info *rt;
+	int tbl_type = 0;
 
-	dst = nip_fib_rule_lookup(net, fln, flags, nip_pol_route_output);
+	dst = nip_fib_rule_lookup(net, fln, flags, &tbl_type, nip_pol_route_output);
 	rt = (struct nip_rt_info *)dst;
 
 	if (!(rt->rt_flags & RTF_LOCAL))

@@ -92,7 +92,7 @@ typedef struct nip_rt_info *(*nip_pol_lookup_t) (struct net *,
 struct nip_fib_table *nip_fib_get_table(struct net *net, u32 id);
 
 struct dst_entry *nip_fib_rule_lookup(struct net *net, struct flow_nip *fln,
-				      int flags, nip_pol_lookup_t lookup);
+				      int flags, int *tbl_type, nip_pol_lookup_t lookup);
 
 #define NIP_RT_EXPIRES_FLAGS 12
 static inline void nip_rt_set_expires(struct nip_rt_info *rt,

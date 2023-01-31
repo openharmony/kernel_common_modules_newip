@@ -16,19 +16,24 @@
 #include "tcp_nip_parameter.h"
 
 struct dst_entry *nip_fib_rule_lookup(struct net *net, struct flow_nip *fln,
-				      int flags, nip_pol_lookup_t lookup)
+				      int flags, int *tbl_type, nip_pol_lookup_t lookup)
 {
 	struct nip_rt_info *rt;
 
 	rt = lookup(net, net->newip.nip_fib_local_tbl, fln, flags);
-	if (rt != net->newip.nip_null_entry)
+	if (rt != net->newip.nip_null_entry) {
+		*tbl_type = (int)RT_TABLE_LOCAL;
 		return &rt->dst;
+	}
 	nip_rt_put(rt);
 	rt = lookup(net, net->newip.nip_fib_main_tbl, fln, flags);
-	if (rt != net->newip.nip_null_entry)
+	if (rt != net->newip.nip_null_entry) {
+		*tbl_type = (int)RT_TABLE_MAIN;
 		return &rt->dst;
+	}
 	nip_rt_put(rt);
 
 	dst_hold(&net->newip.nip_null_entry->dst);
+	*tbl_type = (int)RT_TABLE_MAX;
 	return &net->newip.nip_null_entry->dst;
 }
