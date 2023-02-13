@@ -787,9 +787,8 @@ static int ninet_addr_get(const struct net_device *dev, struct ninet_ifaddr *ifa
 	struct nip_addr addr;
 
 	err = nip_get_firstaddr(dev, &addr);
-	if (err)
-		return err;
-	ifa->addr = addr;
+	if (!err)
+		ifa->addr = addr;
 
 	return err;
 }
