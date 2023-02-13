@@ -360,7 +360,7 @@ struct dst_entry *nip_sk_dst_lookup_flow(struct sock *sk, struct flow_nip *fln)
 
 int tcp_nip_queue_xmit(struct sock *sk, struct sk_buff *skb, struct flowi *fl)
 {
-	int err = -EFAULT;
+	int err;
 	struct net *net = sock_net(sk);
 	struct nip_addr *saddr, *daddr;
 	struct dst_entry *dst;
@@ -389,13 +389,12 @@ int tcp_nip_queue_xmit(struct sock *sk, struct sk_buff *skb, struct flowi *fl)
 	if (!dst) {
 		nip_dbg("no dst cache for sk, search newip rt");
 		dst = nip_route_output(net, sk, &fln);
-		err = dst->error;
-		if (err)
-			goto out_err_release;
 		if (!dst) {
 			nip_dbg("cannot find dst");
 			goto out;
 		}
+		if (dst->error)
+			goto out_err_release;
 		sk_dst_set(sk, dst);
 	}
 	skb_dst_set_noref(skb, dst);
