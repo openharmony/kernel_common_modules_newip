@@ -51,7 +51,7 @@ int ninet_gifconf(struct net_device *dev, char __user *buf, int len, int size)
 			done = -EFAULT;
 			break;
 		}
-		len  -= size;
+		len -= size;
 		done += size;
 	}
 out:
