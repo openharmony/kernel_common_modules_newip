@@ -31,8 +31,8 @@ function main()
     fi
 
     cd $KERNEL_BUILD_ROOT/net/newip/
-    ln -s -f $(realpath --relative-to=$KERNEL_BUILD_ROOT/net/newip   $NEWIP_SOURCE_ROOT/src/linux/net/newip)/*.h ./
-    ln -s -f $(realpath --relative-to=$KERNEL_BUILD_ROOT/net/newip   $NEWIP_SOURCE_ROOT/src/common)/*.h ./
+    ln -s -f $(realpath --relative-to=$KERNEL_BUILD_ROOT/net/newip   $NEWIP_SOURCE_ROOT/src/linux/net/newip)/* ./
+    ln -s -f $(realpath --relative-to=$KERNEL_BUILD_ROOT/net/newip   $NEWIP_SOURCE_ROOT/src/common)/* ./
     cd $KERNEL_BUILD_ROOT/include/uapi/linux
     ln -s -f $(realpath --relative-to=$KERNEL_BUILD_ROOT/include/uapi/linux   $NEWIP_SOURCE_ROOT/src/common)/nip_addr.h nip_addr.h
 
