@@ -159,7 +159,12 @@ rcu_lock_out:
 	rcu_read_unlock_bh();
 
 	if (likely(err == 0)) {
-		nip_dbg("success, idev->refcnt=%u", refcount_read(&idev->refcnt));
+		char add_addr[NIP_ADDR_BIT_LEN_MAX] = {0};
+
+		nip_addr_to_str(addr, add_addr, NIP_ADDR_BIT_LEN_MAX);
+		nip_dbg("success, %s ifindex=%u (addr=%s, idev->refcnt=%u, ifa->refcnt=%u)",
+			idev->dev->name, idev->dev->ifindex, add_addr,
+			refcount_read(&idev->refcnt), refcount_read(&ifa->refcnt));
 	} else {
 		kfree(ifa);
 		nin_dev_put(idev);
@@ -362,11 +367,16 @@ static int ninet_addr_del(struct net *net, int ifindex, u32 ifa_flags,
 	read_lock_bh(&idev->lock);
 	list_for_each_entry(ifp, &idev->addr_list, if_list) {
 		if (nip_addr_eq(pfx, &ifp->addr)) {
+			char addr[NIP_ADDR_BIT_LEN_MAX] = {0};
+
 			nin_ifa_hold(ifp);
 			read_unlock_bh(&idev->lock);
 
+			nip_addr_to_str(&ifp->addr, addr, NIP_ADDR_BIT_LEN_MAX);
 			nip_del_addr(ifp);
-			nip_dbg("nip_addr_del: success");
+			nip_dbg("success, %s ifindex=%u (addr=%s, ifp->refcnt=%u, idev->refcnt=%u)",
+				idev->dev->name, ifindex, addr, refcount_read(&ifp->refcnt),
+				refcount_read(&idev->refcnt));
 			return 0;
 		}
 	}
