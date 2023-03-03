@@ -695,8 +695,8 @@ static int tcp_nip_clean_rtx_queue(struct sock *sk, ktime_t *skb_snd_tstamp)
 		tcp_unlink_write_queue(skb, sk);
 		sk_wmem_free_skb(sk, skb);
 	}
-
-	icsk->icsk_rto = (unsigned int)(HZ / get_nip_rto()); /* V4 no modified this line */
+	/* V4 no modified this line */
+	icsk->icsk_rto = get_nip_rto() == 0 ? TCP_TIMEOUT_INIT : (HZ / get_nip_rto());
 	if (flag & FLAG_ACKED)
 		tcp_nip_rearm_rto(sk);
 	return 0;
