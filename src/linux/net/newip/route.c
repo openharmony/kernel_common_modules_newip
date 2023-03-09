@@ -496,7 +496,7 @@ static int __nip_ins_rt(struct nip_rt_info *rt)
 	table = rt->rt_table;
 
 	spin_lock_bh(&table->nip_tb_lock);
-	err = nip_fib_add(table->nip_tb_head, rt);
+	err = nip_fib_add(table, rt);
 	spin_unlock_bh(&table->nip_tb_lock);
 
 	return err;

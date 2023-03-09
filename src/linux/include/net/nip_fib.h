@@ -142,7 +142,7 @@ struct nip_fib_node *nip_fib_locate(struct hlist_head *nip_tb_head,
 void nip_fib_clean_all(struct net *net,
 		       int (*func)(struct nip_rt_info *, void *arg), void *arg);
 
-int nip_fib_add(struct hlist_head *nip_tb_head, struct nip_rt_info *rt);
+int nip_fib_add(struct nip_fib_table *table, struct nip_rt_info *rt);
 
 int nip_fib_del(struct nip_rt_info *rt_info, struct nl_info *info);
 

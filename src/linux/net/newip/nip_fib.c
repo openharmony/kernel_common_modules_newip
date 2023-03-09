@@ -103,7 +103,7 @@ struct nip_fib_node *nip_fib_locate(struct hlist_head *nip_tb_head,
 }
 
 /* nip_tb_lock must be taken to avoid racing */
-int nip_fib_add(struct hlist_head *nip_tb_head, struct nip_rt_info *rt)
+int nip_fib_add(struct nip_fib_table *table, struct nip_rt_info *rt)
 {
 	struct nip_fib_node *fib_node, *new_node;
 	int err = 0;
@@ -113,15 +113,23 @@ int nip_fib_add(struct hlist_head *nip_tb_head, struct nip_rt_info *rt)
 	char gateway[NIP_ADDR_BIT_LEN_MAX] = {0};
 
 	hash = ninet_route_hash(&rt->rt_dst);
-	h = &nip_tb_head[hash];
+	h = &table->nip_tb_head[hash];
 
 	hlist_for_each_entry(fib_node, h, fib_hlist) {
-		if (nip_addr_and_ifindex_eq
-			(&fib_node->nip_route_info->rt_dst, &rt->rt_dst,
-			fib_node->nip_route_info->rt_idev->dev->ifindex,
-			rt->rt_idev->dev->ifindex)) {
-			err = -EEXIST;
-			goto fail;
+		if (table->nip_tb_id == NIP_RT_TABLE_MAIN) {
+			if (nip_addr_eq(&fib_node->nip_route_info->rt_dst,
+					&rt->rt_dst)) {
+				err = -EEXIST;
+				goto fail;
+			}
+		} else if (table->nip_tb_id == NIP_RT_TABLE_LOCAL) {
+			if (nip_addr_and_ifindex_eq
+				(&fib_node->nip_route_info->rt_dst, &rt->rt_dst,
+				fib_node->nip_route_info->rt_idev->dev->ifindex,
+				rt->rt_idev->dev->ifindex)) {
+				err = -EEXIST;
+				goto fail;
+			}
 		}
 	}
 
