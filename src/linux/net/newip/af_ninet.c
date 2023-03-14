@@ -186,7 +186,7 @@ out_rcu_unlock:
 number_sub:
 	atomic_dec_if_positive(&g_nip_socket_number);
 	num = atomic_read(&g_nip_socket_number);
-	nip_dbg("The final number of socket is: %d", num);
+	nip_dbg("[error] The final number of socket is: %d (after dec)", num);
 	goto out;
 }
 

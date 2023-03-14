@@ -103,23 +103,33 @@ struct nip_fib_node *nip_fib_locate(struct hlist_head *nip_tb_head,
 }
 
 /* nip_tb_lock must be taken to avoid racing */
-int nip_fib_add(struct hlist_head *nip_tb_head, struct nip_rt_info *rt)
+int nip_fib_add(struct nip_fib_table *table, struct nip_rt_info *rt)
 {
 	struct nip_fib_node *fib_node, *new_node;
 	int err = 0;
 	struct hlist_head *h;
 	unsigned int hash;
+	char dst[NIP_ADDR_BIT_LEN_MAX] = {0};
+	char gateway[NIP_ADDR_BIT_LEN_MAX] = {0};
 
 	hash = ninet_route_hash(&rt->rt_dst);
-	h = &nip_tb_head[hash];
+	h = &table->nip_tb_head[hash];
 
 	hlist_for_each_entry(fib_node, h, fib_hlist) {
-		if (nip_addr_and_ifindex_eq
-			(&fib_node->nip_route_info->rt_dst, &rt->rt_dst,
-			fib_node->nip_route_info->rt_idev->dev->ifindex,
-			rt->rt_idev->dev->ifindex)) {
-			err = -EEXIST;
-			goto fail;
+		if (table->nip_tb_id == NIP_RT_TABLE_MAIN) {
+			if (nip_addr_eq(&fib_node->nip_route_info->rt_dst,
+					&rt->rt_dst)) {
+				err = -EEXIST;
+				goto fail;
+			}
+		} else if (table->nip_tb_id == NIP_RT_TABLE_LOCAL) {
+			if (nip_addr_and_ifindex_eq
+				(&fib_node->nip_route_info->rt_dst, &rt->rt_dst,
+				fib_node->nip_route_info->rt_idev->dev->ifindex,
+				rt->rt_idev->dev->ifindex)) {
+				err = -EEXIST;
+				goto fail;
+			}
 		}
 	}
 
@@ -133,6 +143,11 @@ int nip_fib_add(struct hlist_head *nip_tb_head, struct nip_rt_info *rt)
 	rcu_assign_pointer(rt->rt_node, new_node);
 	atomic_inc(&rt->rt_ref);
 	hlist_add_tail_rcu(&new_node->fib_hlist, h);
+	nip_addr_to_str(&rt->rt_dst, dst, NIP_ADDR_BIT_LEN_MAX);
+	nip_addr_to_str(&rt->gateway, gateway, NIP_ADDR_BIT_LEN_MAX);
+	nip_dbg("%s ifindex=%u (addr=%s, gateway=%s, rt_idev->refcnt=%u)",
+		rt->rt_idev->dev->name, rt->rt_idev->dev->ifindex,
+		dst, gateway, refcount_read(&rt->rt_idev->refcnt));
 
 out:
 	return err;
@@ -183,6 +198,7 @@ static void nip_fib_clean_hash(struct net *net, struct hlist_head *nip_tb_head,
 			       void *arg)
 {
 	int i;
+	int err;
 	struct nip_fib_node *fn;
 	struct hlist_node *tmp;
 	struct nl_info info = {
@@ -203,7 +219,9 @@ static void nip_fib_clean_hash(struct net *net, struct hlist_head *nip_tb_head,
 						NIP_ADDR_BIT_LEN_MAX);
 
 				nip_dbg("try to del rt_info, rt_dst=%s, gateway=%s", dst, gateway);
-				nip_fib_del(fn->nip_route_info, &info);
+				err = nip_fib_del(fn->nip_route_info, &info);
+				if (err)
+					nip_dbg("nip_fib_del failed");
 			}
 		}
 	}
