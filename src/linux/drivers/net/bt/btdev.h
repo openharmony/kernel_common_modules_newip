@@ -36,6 +36,10 @@
 /* must include btdev_user.h first before any macro definition */
 #include "btdev_user.h"
 
+#define OK 0
+#define DELAY_100_MS 100
+#define MACADDR_LEN (2 * ETH_ALEN)
+
 #define BT_DEV_MAJOR 125
 #define BT_DEV_MINOR 0
 #define BT_RING_BUFFER_SIZE 4096
