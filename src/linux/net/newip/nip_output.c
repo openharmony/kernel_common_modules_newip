@@ -360,7 +360,7 @@ struct dst_entry *nip_sk_dst_lookup_flow(struct sock *sk, struct flow_nip *fln)
 
 int tcp_nip_queue_xmit(struct sock *sk, struct sk_buff *skb, struct flowi *fl)
 {
-	int err;
+	int err = -EHOSTUNREACH;
 	struct net *net = sock_net(sk);
 	struct nip_addr *saddr, *daddr;
 	struct dst_entry *dst;

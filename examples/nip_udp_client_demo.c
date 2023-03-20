@@ -86,8 +86,9 @@ int _recvfrom(int cfd, struct sockaddr_nin *si_server, int pkt_num, int *success
 		if (ret > 0) {
 			*success += 1;
 			ret = sscanf(buf, "%d %d NIP_UDP # %d", &tmp, &tmp, &no);
-			printf("Received --%s sock %d success:%6d/%6d/no=%6d\n",
-				   buf, cfd, *success, pkt_num + 1, no);
+			if (ret)
+				printf("Received --%s sock %d success:%6d/%6d/no=%6d\n",
+				       buf, cfd, *success, pkt_num + 1, no);
 		} else {
 			printf("client recvfrom fail, ret=%d\n", ret);
 			return -1;
