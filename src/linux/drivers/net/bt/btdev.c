@@ -393,11 +393,11 @@ static int bt_mng_file_open(struct inode *node, struct file *filp)
 
 static int bt_mng_file_release(struct inode *node, struct file *filp)
 {
-	struct bt_drv *bt_drv = filp->private_data;
+	struct bt_drv *drv = filp->private_data;
 
 	pr_devel("bt mng file release called");
 
-	atomic_inc(&bt_drv->mng_file->open_limit);
+	atomic_inc(&drv->mng_file->open_limit);
 	return OK;
 }
 

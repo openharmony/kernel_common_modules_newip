@@ -231,10 +231,10 @@ static inline int bt_virnet_get_ring_packets(const struct bt_virnet *vn)
 static struct bt_table *bt_table_init(void);
 static int bt_table_add_device(struct bt_table *tbl, struct bt_virnet *vn);
 static void bt_table_remove_device(struct bt_table *tbl, struct bt_virnet *vn);
-static void bt_table_delete_all(struct bt_drv *drv);
+static void bt_table_delete_all(struct bt_drv *bt_drv);
 static struct bt_virnet *bt_table_find(struct bt_table *tbl, const char *ifa_name);
-static void bt_table_destroy(struct bt_drv *drv);
-static void bt_delete_io_files(struct bt_drv *drv);
+static void bt_table_destroy(struct bt_drv *bt_drv);
+static void bt_delete_io_files(struct bt_drv *bt_mng);
 static struct bt_io_file **bt_create_io_files(void);
 
 static struct bt_ring *bt_ring_create(void);
@@ -246,7 +246,7 @@ static void bt_ring_consume(struct bt_ring *ring);
 static void bt_ring_destroy(struct bt_ring *ring);
 
 static int bt_virnet_produce_data(struct bt_virnet *dev, void *data);
-static struct bt_virnet *bt_virnet_create(struct bt_drv *drv, u32 id);
-static void bt_virnet_destroy(struct bt_virnet *dev);
+static struct bt_virnet *bt_virnet_create(struct bt_drv *bt_mng, u32 id);
+static void bt_virnet_destroy(struct bt_virnet *vnet);
 
 #endif
