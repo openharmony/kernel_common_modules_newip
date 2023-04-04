@@ -23,8 +23,6 @@ function main()
     ln -s -f $(realpath --relative-to=$KERNEL_BUILD_ROOT/include/net         $NEWIP_SOURCE_ROOT/src/linux/include/net)/*.h ./
     cd $KERNEL_BUILD_ROOT/include/uapi/linux
     ln -s -f $(realpath --relative-to=$KERNEL_BUILD_ROOT/include/uapi/linux  $NEWIP_SOURCE_ROOT/src/linux/include/uapi/linux)/*.h ./
-    cd $KERNEL_BUILD_ROOT/include/trace/hooks
-    ln -s -f $(realpath --relative-to=$KERNEL_BUILD_ROOT/include/trace/hooks $NEWIP_SOURCE_ROOT/src/linux/include/trace/hooks)/*.h ./
 
     if [ ! -d " $KERNEL_BUILD_ROOT/net/newip" ]; then
         mkdir $KERNEL_BUILD_ROOT/net/newip
