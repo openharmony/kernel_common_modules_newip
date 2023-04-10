@@ -1074,6 +1074,13 @@ int _tcp_nip_conn_request(struct request_sock_ops *rsk_ops,
 
 	af_ops->init_req(req, sk, skb);
 
+	/* Based on the security context of the socket and packet,
+	 * this function calculates the security context of the connection
+	 * and checks whether establishing a TCP connection is permitted.
+	 */
+	if (security_inet_conn_request(sk, skb, req))
+		goto drop_and_free;
+
 	if (!isn)
 		isn = af_ops->init_seq(skb);
 
